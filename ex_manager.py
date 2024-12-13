@@ -193,6 +193,8 @@ try:
             )
 
             print(f"BN매도 완료! 수량: {quantity} {coin}")
+            # 매도 후 잔고 조회
+            get_spot_balance()
         except Exception as e:
             print(f"에러 발생: {e}")
 
@@ -235,6 +237,8 @@ try:
                 quantity=quantity
             )
             print(f"BN매수 완료! {quantity} {coin} 매수 완료.")
+            # 매수 후 잔고 조회
+            get_spot_balance()
         except Exception as e:
             print(f"에러 발생: {e}")
 
@@ -265,6 +269,8 @@ try:
             ]
 
             print("\n=== Binance 스팟 지갑 잔고 ===")
+            if not balances:
+                print("잔고가 없습니다.")
             for balance in balances:
                 coin = balance['asset']
                 free = float(balance['free'])
@@ -387,6 +393,8 @@ try:
 
             if order_resp['retCode'] == 0:
                 print(f"BB매도 완료! 수량: {qty_str} {coin}")
+                # 매도 후 잔고 조회
+                get_bybit_balance()
             else:
                 print(f"매도 실패: {order_resp['retMsg']}")
         except Exception as e:
@@ -430,13 +438,12 @@ try:
 
             if order_resp['retCode'] == 0:
                 print(f"BB매수 완료! 약 {usdt_to_use} USDT 상당의 {coin} 매수")
-                # 매수 완료 후 잔고 재조회
+                # 매수 후 잔고 조회
                 get_bybit_balance()
             else:
                 print(f"매수 실패: {order_resp['retMsg']}")
         except Exception as e:
             print(f"에러 발생: {e}")
-
 
 except Exception as e:
     print(f"Bybit 관련 코드에서 에러 발생: {e}")
@@ -534,8 +541,8 @@ def place_spot_order(symbol, side, orderType, force, size, price=None, clientOid
 
     endpoint = "/api/v2/spot/trade/place-order"
     result = send_request("POST", endpoint, body=body, need_auth=True)
-    print(f"{side} 주문 결과:")
-    print(json.dumps(result, indent=2))
+    # 주문 결과를 직접 print하지 않고 호출하는 함수쪽에서 처리
+    return result
 
 def get_bitget_symbol_info(symbol):
     endpoint = "/api/v2/spot/public/symbols"
@@ -552,6 +559,26 @@ def get_bitget_symbol_info(symbol):
         if p.get("symbol") == symbol:
             return p
     return None
+
+def print_bitget_balances():
+    res = check_spot_balance()
+    if res and res.get("code") == "00000":
+        print("\n=== Bitget Spot 지갑 잔고 ===")
+        data = res.get("data", [])
+        if not data:
+            print("잔고가 없습니다.")
+        else:
+            coins_found = False
+            for b in data:
+                coin = b.get("coin")
+                available = b.get("available")
+                if float(available) > 0:
+                    print(f"{coin}: 사용 가능: {available}")
+                    coins_found = True
+            if not coins_found:
+                print("잔고가 없습니다.")
+    else:
+        print("Bitget 잔고 조회 실패")
 
 def bitget_buy_all_coin_with_usdt(coin):
     coin = coin.upper()
@@ -577,7 +604,12 @@ def bitget_buy_all_coin_with_usdt(coin):
         return
 
     symbol = coin + "USDT"
-    place_spot_order(symbol=symbol, side="buy", orderType="market", force="normal", size=str(usdt_to_use))
+    order_resp = place_spot_order(symbol=symbol, side="buy", orderType="market", force="normal", size=str(usdt_to_use))
+    if order_resp.get("code") == "00000":
+        print(f"BG매수 완료! 약 {usdt_to_use} USDT 상당의 {coin} 매수")
+        print_bitget_balances()
+    else:
+        print(f"매수 실패: {order_resp.get('msg')}")
 
 def bitget_sell_all_coin(coin):
     coin = coin.upper()
@@ -617,7 +649,12 @@ def bitget_sell_all_coin(coin):
 
     size_str = f"{safe_size:.{quantity_precision}f}"
 
-    place_spot_order(symbol=symbol, side="sell", orderType="market", force="normal", size=size_str)
+    order_resp = place_spot_order(symbol=symbol, side="sell", orderType="market", force="normal", size=size_str)
+    if order_resp.get("code") == "00000":
+        print(f"BG매도 완료! 수량: {size_str} {coin}")
+        print_bitget_balances()
+    else:
+        print(f"매도 실패: {order_resp.get('msg')}")
 
 
 ##############################################
@@ -677,8 +714,14 @@ if __name__ == "__main__":
     # Bitget 명령어
     def BG매도():
         res = check_spot_balance()
-        if res:
-            print("Spot 지갑 잔고 조회 결과:", json.dumps(res, indent=2))
+        if res and res.get("code") == "00000":
+            print("\n=== Bitget Spot 지갑 잔고 조회 ===")
+            data = res.get("data", [])
+            if not data:
+                print("잔고가 없습니다.")
+            else:
+                for b in data:
+                    print(f"{b['coin']}: 사용 가능: {b['available']}")
         coin = input("전액 매도할 코인명을 입력해주세요: ").strip()
         if coin:
             bitget_sell_all_coin(coin)
@@ -687,8 +730,14 @@ if __name__ == "__main__":
 
     def BG매수():
         res = check_spot_balance()
-        if res:
-            print("Spot 지갑 잔고 조회 결과:", json.dumps(res, indent=2))
+        if res and res.get("code") == "00000":
+            print("\n=== Bitget Spot 지갑 잔고 조회 ===")
+            data = res.get("data", [])
+            if not data:
+                print("잔고가 없습니다.")
+            else:
+                for b in data:
+                    print(f"{b['coin']}: 사용 가능: {b['available']}")
         coin = input("전액 매수할 코인명을 입력해주세요: ").strip()
         if coin:
             bitget_buy_all_coin_with_usdt(coin)
@@ -696,7 +745,7 @@ if __name__ == "__main__":
             print("코인명을 입력하지 않아 매수를 취소합니다.")
 
     if 'check_spot_balance' in globals():
-        commands['BG조회'] = lambda: (lambda res=check_spot_balance(): print("Spot 지갑 잔고 조회 결과:", json.dumps(res, indent=2)) if res else None)()
+        commands['BG조회'] = lambda: print_bitget_balances()
     commands['BG매도'] = BG매도
     commands['BG매수'] = BG매수
     if 'get_spot_account_info' in globals():
@@ -718,9 +767,7 @@ if __name__ == "__main__":
 
         if 'check_spot_balance' in globals():
             print("=== Bitget Spot 잔고 조회 ===")
-            res = check_spot_balance()
-            if res:
-                print("Spot 지갑 잔고 조회 결과:", json.dumps(res, indent=2))
+            print_bitget_balances()
             print()
 
         if 'get_spot_account_info' in globals():
