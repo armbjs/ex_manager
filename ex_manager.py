@@ -200,6 +200,28 @@ try:
         except Exception as e:
             return {"error": str(e)}
 
+    def calculate_account_avg_buy_price(client, coin):
+        trades = get_recent_trades_raw(client, coin)
+        if isinstance(trades, dict) and trades.get("error"):
+            return None
+        if not isinstance(trades, list):
+            return None
+
+        total_qty = 0.0
+        total_cost = 0.0
+        for t in trades:
+            if float(t['qty']) > 0 and t['isBuyer'] == True:
+                trade_price = float(t['price'])
+                trade_qty = float(t['qty'])
+                total_cost += trade_price * trade_qty
+                total_qty += trade_qty
+
+        if total_qty > 0:
+            avg_price = total_cost / total_qty
+            return avg_price
+        else:
+            return None
+
 except Exception:
     pass
 
@@ -326,7 +348,6 @@ try:
     def get_recent_bybit_trades_raw(coin):
         try:
             symbol = (coin.upper() + "USDT")
-            # Bybit Unified Trading 체결내역 조회
             resp = bybit_client.get_executions(category="spot", symbol=symbol, limit=200)
 
             if resp['retCode'] != 0:
@@ -352,11 +373,32 @@ try:
                     'isBuyer': is_buyer
                 })
 
-            # Bybit 응답이 최근 체결부터 정렬된 경우, 오래된 것부터 출력하기 위해 뒤집기
-            trades_list.sort(key=lambda x: x['time'])  # time 기준 오름차순 정렬
+            trades_list.sort(key=lambda x: x['time'])
             return trades_list
         except Exception as e:
             return {"error": str(e)}
+
+    def calculate_bybit_avg_buy_price(coin):
+        trades = get_recent_bybit_trades_raw(coin)
+        if isinstance(trades, dict) and trades.get("error"):
+            return None
+        if not isinstance(trades, list):
+            return None
+
+        total_qty = 0.0
+        total_cost = 0.0
+        for t in trades:
+            if t.get('isBuyer'):
+                trade_price = float(t['price'])
+                trade_qty = float(t['qty'])
+                total_cost += trade_price * trade_qty
+                total_qty += trade_qty
+
+        if total_qty > 0:
+            avg_price = total_cost / total_qty
+            return avg_price
+        else:
+            return None
 
 except Exception as e:
     print(f"Bybit 관련 코드에서 에러 발생: {e}")
@@ -507,9 +549,114 @@ def bitget_sell_all_coin_raw(coin):
         safe_size = min_trade_amount
 
     size_str = f"{safe_size:.{quantity_precision}f}"
-
     order_resp = place_spot_order(symbol=symbol, side="sell", order_type="market", force="normal", size=size_str)
     return order_resp
+
+def get_recent_bg_trades_raw(coin):
+    try:
+        symbol = (coin.upper() + "USDT")
+        endpoint = "/api/v2/spot/trade/fills"
+        params = {
+            "symbol": symbol,
+            "limit": "100"
+        }
+
+        resp = send_request("GET", endpoint, params=params, need_auth=True)
+        if resp.get("code") != "00000":
+            return {"error": resp.get("msg", "Unknown error")}
+
+        data = resp.get("data", [])
+        trades_list = []
+        for t in data:
+            side_str = t.get('side', '').lower()
+            price = t.get('priceAvg', '0')
+            qty = t.get('size', '0')
+            sym = t.get('symbol', 'UNKNOWN')
+            ctime_str = t.get('cTime', '0')
+            exec_time = int(ctime_str) if ctime_str.isdigit() else 0
+
+            is_buyer = True if side_str == 'buy' else False
+
+            trades_list.append({
+                'symbol': sym,
+                'price': price,
+                'qty': qty,
+                'time': exec_time,
+                'isBuyer': is_buyer
+            })
+
+        trades_list.sort(key=lambda x: x['time'])
+        return trades_list
+    except Exception as e:
+        return {"error": str(e)}
+
+def calculate_bg_avg_buy_price(coin):
+    trades = get_recent_bg_trades_raw(coin)
+    if isinstance(trades, dict) and trades.get("error"):
+        return None
+    if not isinstance(trades, list):
+        return None
+
+    total_qty = 0.0
+    total_cost = 0.0
+    for t in trades:
+        if t.get('isBuyer'):
+            trade_price = float(t['price'])
+            trade_qty = float(t['qty'])
+            total_cost += trade_price * trade_qty
+            total_qty += trade_qty
+
+    if total_qty > 0:
+        avg_price = total_cost / total_qty
+        return avg_price
+    else:
+        return None
+
+##############################################
+# 손익평가
+##############################################
+def get_current_price(coin):
+    symbol = coin.upper() + "USDT"
+    ticker = binance_client_cr.get_symbol_ticker(symbol=symbol)
+    return float(ticker['price'])
+
+def show_profit_loss_per_account(coin):
+    binance_accounts = [
+        (binance_client_cr, "CR"),
+        (binance_client_lilac, "LILAC"),
+        (binance_client_ex, "EX")
+    ]
+
+    current_price = get_current_price(coin)
+
+    print("=== Binance 계정 손익평가 ===")
+    for client, acc_name in binance_accounts:
+        avg_price = calculate_account_avg_buy_price(client, coin)
+        if avg_price is not None:
+            pnl = current_price - avg_price
+            pnl_percent = (pnl / avg_price) * 100.0
+            print(f"[BN-{acc_name} 계정] 현재가: {current_price:.3f}, 매수평단가: {avg_price:.3f}, 손익: {pnl_percent:.3f}% (현재가 - 매수평단가 비율)")
+        else:
+            print(f"[BN-{acc_name} 계정] 매수내역이 없어 평단가를 계산할 수 없습니다.")
+
+    avg_price_bybit = calculate_bybit_avg_buy_price(coin)
+    print("=== Bybit 계정 손익평가 ===")
+    if avg_price_bybit is not None:
+        pnl = current_price - avg_price_bybit
+        pnl_percent = (pnl / avg_price_bybit) * 100.0
+        print(f"[BB 계정] 현재가: {current_price:.3f}, 매수평단가: {avg_price_bybit:.3f}, 손익: {pnl_percent:.3f}% (현재가 - 매수평단가 비율)")
+    else:
+        print("[BB 계정] 매수내역이 없어 평단가를 계산할 수 없습니다.")
+
+    # Bitget 계정 손익평가 추가
+    avg_price_bg = calculate_bg_avg_buy_price(coin)
+    print("=== Bitget 계정 손익평가 ===")
+    if avg_price_bg is not None:
+        pnl = current_price - avg_price_bg
+        pnl_percent = (pnl / avg_price_bg) * 100.0
+        print(f"[BG 계정] 현재가: {current_price:.3f}, 매수평단가: {avg_price_bg:.3f}, 손익: {pnl_percent:.3f}% (현재가 - 매수평단가 비율)")
+    else:
+        print("[BG 계정] 매수내역이 없어 평단가를 계산할 수 없습니다.")
 
 
 ##############################################
@@ -517,7 +664,6 @@ def bitget_sell_all_coin_raw(coin):
 ##############################################
 def print_trade_history(trades):
     if isinstance(trades, dict) and trades.get("error"):
-        # 에러 발생 시 에러 메세지 출력
         print(trades)
         return
 
@@ -630,55 +776,6 @@ def sell_all(coin):
 
 
 ##############################################
-# 손익평가 (계정별)
-##############################################
-def get_current_price(coin):
-    symbol = coin.upper() + "USDT"
-    ticker = binance_client_cr.get_symbol_ticker(symbol=symbol)
-    return float(ticker['price'])
-
-def calculate_account_avg_buy_price(client, coin):
-    trades = get_recent_trades_raw(client, coin)
-    if isinstance(trades, dict) and trades.get("error"):
-        return None
-    if not isinstance(trades, list):
-        return None
-
-    total_qty = 0.0
-    total_cost = 0.0
-    for t in trades:
-        if t.get('isBuyer'):
-            trade_price = float(t['price'])
-            trade_qty = float(t['qty'])
-            total_cost += trade_price * trade_qty
-            total_qty += trade_qty
-
-    if total_qty > 0:
-        avg_price = total_cost / total_qty
-        return avg_price
-    else:
-        return None
-
-def show_profit_loss_per_account(coin):
-    accounts = [
-        (binance_client_cr, "CR"),
-        (binance_client_lilac, "LILAC"),
-        (binance_client_ex, "EX")
-    ]
-
-    current_price = get_current_price(coin)
-
-    for client, acc_name in accounts:
-        avg_price = calculate_account_avg_buy_price(client, coin)
-        if avg_price is not None:
-            pnl = current_price - avg_price
-            pnl_percent = (pnl / avg_price) * 100.0
-            print(f"[{acc_name} 계정] 현재가: {current_price:.3f}, 매수평단가: {avg_price:.3f}, 손익: {pnl_percent:.3f}% (현재가 - 매수평단가 비율)")
-        else:
-            print(f"[{acc_name} 계정] 매수내역이 없어 평단가를 계산할 수 없습니다.")
-
-
-##############################################
 # 메인 로직
 ##############################################
 test_run = run_tests
@@ -729,10 +826,15 @@ while True:
             ex_trades = get_recent_trades_raw(binance_client_ex, c)
             print_trade_history(ex_trades)
 
-            # Bybit 체결내역 추가
+            # Bybit 체결내역
             print(f"=== Bybit 체결내역 조회 [{c.upper()}] ===")
             bb_trades = get_recent_bybit_trades_raw(c)
             print_trade_history(bb_trades)
+
+            # Bitget 체결내역 추가
+            print(f"=== Bitget 체결내역 조회 [{c.upper()}] ===")
+            bg_trades = get_recent_bg_trades_raw(c)
+            print_trade_history(bg_trades)
         else:
             print("체결조회 명령 형식: 체결조회.COIN")
         continue
