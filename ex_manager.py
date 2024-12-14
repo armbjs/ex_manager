@@ -323,6 +323,41 @@ try:
         except Exception as e:
             return {"error": str(e)}
 
+    def get_recent_bybit_trades_raw(coin):
+        try:
+            symbol = (coin.upper() + "USDT")
+            # Bybit Unified Trading 체결내역 조회
+            resp = bybit_client.get_executions(category="spot", symbol=symbol, limit=200)
+
+            if resp['retCode'] != 0:
+                return {"error": resp.get('retMsg', 'Unknown error')}
+
+            trades_data = resp.get('result', {}).get('list', [])
+            trades_list = []
+            for t in trades_data:
+                exec_time_str = t.get('execTime', '0')
+                exec_time = int(exec_time_str) if exec_time_str.isdigit() else 0
+
+                side_str = t.get('side', '').lower()
+                price = t.get('execPrice', '0')
+                qty = t.get('execQty', '0')
+                sym = t.get('symbol', 'UNKNOWN')
+                is_buyer = True if side_str == 'buy' else False
+
+                trades_list.append({
+                    'symbol': sym,
+                    'price': price,
+                    'qty': qty,
+                    'time': exec_time,
+                    'isBuyer': is_buyer
+                })
+
+            # Bybit 응답이 최근 체결부터 정렬된 경우, 오래된 것부터 출력하기 위해 뒤집기
+            trades_list.sort(key=lambda x: x['time'])  # time 기준 오름차순 정렬
+            return trades_list
+        except Exception as e:
+            return {"error": str(e)}
+
 except Exception as e:
     print(f"Bybit 관련 코드에서 에러 발생: {e}")
 
@@ -681,6 +716,7 @@ while True:
         parts = choice.split(".")
         if len(parts) == 2:
             c = parts[1]
+            # Binance 3계정
             print(f"=== Binance 체결내역 조회 (CR 계정) [{c.upper()}] ===")
             cr_trades = get_recent_trades_raw(binance_client_cr, c)
             print_trade_history(cr_trades)
@@ -692,6 +728,11 @@ while True:
             print(f"=== Binance 체결내역 조회 (EX 계정) [{c.upper()}] ===")
             ex_trades = get_recent_trades_raw(binance_client_ex, c)
             print_trade_history(ex_trades)
+
+            # Bybit 체결내역 추가
+            print(f"=== Bybit 체결내역 조회 [{c.upper()}] ===")
+            bb_trades = get_recent_bybit_trades_raw(c)
+            print_trade_history(bb_trades)
         else:
             print("체결조회 명령 형식: 체결조회.COIN")
         continue
