@@ -786,127 +786,13 @@ while True:
     print("Or use 'buy.COIN.value', 'sell.COIN', 'show_trx.COIN', 'show_pnl.COIN', 'show_bal' commands")
     cmd = input("Input: ").strip()
 
-    if cmd.startswith("buy."):
-        parts = cmd.split(".")
-        if len(parts) == 3:
-            c = parts[1]
-            value_str = parts[2]
-            try:
-                value = float(value_str)
-                buy_all(c, value)
-            except:
-                print("invalid value")
-        else:
-            print("format: buy.COIN.value")
-        continue
-
-    if cmd.startswith("sell."):
-        parts = cmd.split(".")
-        if len(parts) == 2:
-            c = parts[1]
-            sell_all(c)
-        else:
-            print("format: sell.COIN")
-        continue
-
-    if cmd.startswith("show_trx."):
-        parts = cmd.split(".")
-        if len(parts) == 2:
-            c = parts[1]
-            print(f"=== Binance show_trx (CR) [{c.upper()}] ===")
-            cr_trades = get_recent_trades_raw(binance_client_cr, c)
-            print_trade_history(cr_trades)
-
-            print(f"=== Binance show_trx (LILAC) [{c.upper()}] ===")
-            lilac_trades = get_recent_trades_raw(binance_client_lilac, c)
-            print_trade_history(lilac_trades)
-
-            print(f"=== Binance show_trx (EX) [{c.upper()}] ===")
-            ex_trades = get_recent_trades_raw(binance_client_ex, c)
-            print_trade_history(ex_trades)
-
-            print(f"=== Bybit show_trx [{c.upper()}] ===")
-            bb_trades = get_recent_bybit_trades_raw(c)
-            print_trade_history(bb_trades)
-
-            print(f"=== Bitget show_trx [{c.upper()}] ===")
-            bg_trades = get_recent_bg_trades_raw(c)
-            print_trade_history(bg_trades)
-        else:
-            print("format: show_trx.COIN")
-        continue
-
-    if cmd.startswith("show_pnl."):
-        parts = cmd.split(".")
-        if len(parts) == 2:
-            c = parts[1]
-            show_profit_loss_per_account(c)
-        else:
-            print("format: show_pnl.COIN")
-        continue
-
-    if cmd.startswith("show_bal"):
-        print("\n=== All Wallet Balances ===\n")
-
-        print("=== Binance Spot Balances (3acc) ===")
-        get_spot_balance_all()
-        print()
-
-        print("=== Bybit Unified Balances (1acc) ===")
-        try:
-            response = bybit_client.get_wallet_balance(accountType="UNIFIED")
-            if response['retCode'] == 0:
-                coins_found = False
-                for account_item in response['result']['list']:
-                    for c in account_item['coin']:
-                        wallet_balance = float(c.get('walletBalance', 0))
-                        if wallet_balance > 0:
-                            print(f"{c['coin']}: balance: {wallet_balance}")
-                            coins_found = True
-                if not coins_found:
-                    print("no balance")
-            else:
-                print(f"balance query failed: {response['retMsg']}")
-        except Exception as e:
-            print(f"error: {e}")
-        print()
-
-        print("=== Bitget Spot Balances (1acc) ===")
-        try:
-            res = check_spot_balance()
-            if res and res.get("code") == "00000":
-                data = res.get("data", [])
-                if not data:
-                    print("no balance")
-                else:
-                    coins_found = False
-                    for b in data:
-                        coin = b.get("coin")
-                        available = float(b.get("available", 0))
-                        if available > 0:
-                            print(f"{coin}: available: {available}")
-                            coins_found = True
-                    if not coins_found:
-                        print("no balance")
-            else:
-                print("Bitget balance query failed")
-        except Exception as e:
-            print(f"error: {e}")
-
-        print("\n=== Wallet balances end ===\n")
-        continue
-
-    coin_input = input("BG (sell) all coin: ").strip()
-    if coin_input:
-        order_data = bitget_sell_all_coin_raw(coin_input)
-        print(order_data)
-    else:
-        print("no coin, cancel")
-
+    # 1. Test notices
     if cmd == '1':
         if test_run:
             test_run()
+        continue
 
+    # 2. Binance account operations
     elif cmd == '2':
         print("Select BN account: 1(CR), 2(LILAC), 3(EX)")
         bn_acc_choice = input("Input: ").strip().lower()
@@ -948,124 +834,175 @@ while True:
                 print("no coin, cancel")
         else:
             print("invalid selection, cancel")
+        continue
 
+    # 3. BB Buy
     elif cmd == '3':
-        resp = bybit_client.get_wallet_balance(accountType="UNIFIED")
-        if resp['retCode'] == 0:
-            coins_found = False
-            for account_item in resp['result']['list']:
-                for c in account_item['coin']:
-                    wbal = float(c.get('walletBalance', 0))
-                    if wbal > 0:
-                        print(f"{c['coin']}: balance: {wbal}")
-                        coins_found = True
-            if not coins_found:
-                print("no balance")
-        else:
-            print(f"balance check failed: {resp['retMsg']}")
-
         coin_input = input("BB (buy) coin: ").strip()
         if not coin_input:
             print("no coin, cancel")
             continue
-
         try:
             usdt_str = input(f"{coin_input.upper()} buy USDT amount: ").strip()
             usdt_amount = float(usdt_str)
         except:
             print("invalid amount, cancel")
             continue
-
         order_data = buy_bybit_coin_usdt_raw(coin_input, usdt_amount)
         print(order_data)
+        continue
 
+    # 4. BB Sell
     elif cmd == '4':
-        resp = bybit_client.get_wallet_balance(accountType="UNIFIED")
-        if resp['retCode'] == 0:
-            coins_found = False
-            for account_item in resp['result']['list']:
-                for c in account_item['coin']:
-                    wbal = float(c.get('walletBalance', 0))
-                    if wbal > 0:
-                        print(f"{c['coin']}: balance: {wbal}")
-                        coins_found = True
-            if not coins_found:
-                print("no balance")
-        else:
-            print(f"balance check failed: {resp['retMsg']}")
-
         coin_input = input("BB (sell) all coin: ").strip()
         if coin_input:
             order_data = sell_all_bybit_coin_raw(coin_input)
             print(order_data)
         else:
             print("no coin, cancel")
+        continue
 
+    # 5. BG Buy
     elif cmd == '5':
-        res = check_spot_balance()
-        if res and res.get("code") == "00000":
-            data = res.get("data", [])
-            print("\n=== Bitget Spot Balances ===")
-            if not data:
-                print("no balance")
-            else:
-                coins_found = False
-                for b in data:
-                    c_name = b.get("coin")
-                    av = b.get("available")
-                    if float(av) > 0:
-                        print(f"{c_name}: available: {av}")
-                        coins_found = True
-                if not coins_found:
-                    print("no balance")
-        else:
-            print("Bitget balance check failed")
-
         coin_input = input("BG (buy) coin: ").strip()
         if not coin_input:
             print("no coin, cancel")
             continue
-
         try:
             usdt_str = input(f"{coin_input.upper()} buy USDT amount: ").strip()
             usdt_amount = float(usdt_str)
         except:
             print("invalid amount, cancel")
             continue
-
         order_data = bitget_buy_coin_usdt_raw(coin_input, usdt_amount)
         print(order_data)
+        continue
 
+    # 6. BG Sell
     elif cmd == '6':
-        res = check_spot_balance()
-        if res and res.get("code") == "00000":
-            data = res.get("data", [])
-            print("\n=== Bitget Spot Balances ===")
-            if not data:
-                print("no balance")
-            else:
-                coins_found = False
-                for b in data:
-                    c_name = b.get("coin")
-                    av = b.get("available")
-                    if float(av) > 0:
-                        print(f"{c_name}: available: {av}")
-                        coins_found = True
-                if not coins_found:
-                    print("no balance")
-        else:
-            print("Bitget balance check failed")
-
         coin_input = input("BG (sell) all coin: ").strip()
         if coin_input:
             order_data = bitget_sell_all_coin_raw(coin_input)
             print(order_data)
         else:
             print("no coin, cancel")
+        continue
 
-
+    # 7. Exit
     elif cmd == '7':
         print("Exiting program.")
         break
+
+    # Advanced commands
+    elif cmd.startswith("buy."):
+        parts = cmd.split(".")
+        if len(parts) == 3:
+            c = parts[1]
+            value_str = parts[2]
+            try:
+                value = float(value_str)
+                buy_all(c, value)
+            except:
+                print("invalid value")
+        else:
+            print("format: buy.COIN.value")
+        continue
+
+    elif cmd.startswith("sell."):
+        parts = cmd.split(".")
+        if len(parts) == 2:
+            c = parts[1]
+            sell_all(c)
+        else:
+            print("format: sell.COIN")
+        continue
+
+    elif cmd.startswith("show_trx."):
+        parts = cmd.split(".")
+        if len(parts) == 2:
+            c = parts[1].upper()  # COIN 이름 대문자로 변환
+            print(f"=== Transaction History for {c} ===")
+            try:
+                # Binance 거래 내역
+                print(f"=== Binance (CR) [{c}] ===")
+                cr_trades = get_recent_trades_raw(binance_client_cr, c)
+                print_trade_history(cr_trades)
+
+                print(f"=== Binance (LILAC) [{c}] ===")
+                lilac_trades = get_recent_trades_raw(binance_client_lilac, c)
+                print_trade_history(lilac_trades)
+
+                print(f"=== Binance (EX) [{c}] ===")
+                ex_trades = get_recent_trades_raw(binance_client_ex, c)
+                print_trade_history(ex_trades)
+
+                # Bybit 거래 내역
+                print(f"=== Bybit [{c}] ===")
+                bb_trades = get_recent_bybit_trades_raw(c)
+                print_trade_history(bb_trades)
+
+                # Bitget 거래 내역
+                print(f"=== Bitget [{c}] ===")
+                bg_trades = get_recent_bg_trades_raw(c)
+                print_trade_history(bg_trades)
+
+            except Exception as e:
+                print(f"Error fetching transactions for {c}: {e}")
+        else:
+            print("format: show_trx.COIN")
+        continue
+
+    elif cmd.startswith("show_pnl."):
+        parts = cmd.split(".")
+        if len(parts) == 2:
+            c = parts[1]
+            show_profit_loss_per_account(c)
+        else:
+            print("format: show_pnl.COIN")
+        continue
+
+    elif cmd == "show_bal":
+        print("\n=== All Wallet Balances ===\n")
+
+        print("=== Binance Spot Balances (3acc) ===")
+        get_spot_balance_all()
+        print()
+
+        print("=== Bybit Unified Balances (1acc) ===")
+        try:
+            response = bybit_client.get_wallet_balance(accountType="UNIFIED")
+            if response['retCode'] == 0:
+                for account_item in response['result']['list']:
+                    for c in account_item['coin']:
+                        wallet_balance = float(c.get('walletBalance', 0))
+                        if wallet_balance > 0:
+                            print(f"{c['coin']}: balance: {wallet_balance}")
+            else:
+                print(f"Bybit balance query failed: {response['retMsg']}")
+        except Exception as e:
+            print(f"Bybit error: {e}")
+        print()
+
+        print("=== Bitget Spot Balances (1acc) ===")
+        try:
+            res = check_spot_balance()
+            if res and res.get("code") == "00000":
+                data = res.get("data", [])
+                if not data:
+                    print("no balance")
+                else:
+                    for b in data:
+                        coin = b.get("coin")
+                        available = float(b.get("available", 0))
+                        if available > 0:
+                            print(f"{coin}: available: {available}")
+            else:
+                print("Bitget balance query failed")
+        except Exception as e:
+            print(f"Bitget error: {e}")
+        print("\n=== Wallet balances end ===\n")
+
+
+    # Default invalid command handler
     else:
-        print("No such feature. (1=test/2=wal/3=BN/4=BB buy/5=BB sell/6=BG buy/7=BG sell/8=exit)")
+        print("No such feature.")
