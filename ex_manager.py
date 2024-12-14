@@ -635,7 +635,7 @@ def show_profit_loss_per_account(coin):
         if avg_price is not None:
             pnl = current_price - avg_price
             pnl_percent = (pnl / avg_price) * 100.0
-            print(f"[BN-{acc_name}] current: {current_price:.3f}, avg: {avg_price:.3f}, pnl: {pnl_percent:.3f}%")
+            print(f"[BN-{acc_name}] current_price: ${current_price:.3f}, avg_price: ${avg_price:.3f}, pnl: {pnl_percent:.3f}%")
         else:
             print(f"[BN-{acc_name}] no buy history")
 
@@ -644,7 +644,7 @@ def show_profit_loss_per_account(coin):
     if avg_price_bybit is not None:
         pnl = current_price - avg_price_bybit
         pnl_percent = (pnl / avg_price_bybit) * 100.0
-        print(f"[BB] current: {current_price:.3f}, avg: {avg_price_bybit:.3f}, pnl: {pnl_percent:.3f}%")
+        print(f"[BB] current_price: ${current_price:.3f}, avg_price: ${avg_price_bybit:.3f}, pnl: {pnl_percent:.3f}%")
     else:
         print("[BB] no buy history")
 
@@ -653,9 +653,10 @@ def show_profit_loss_per_account(coin):
     if avg_price_bg is not None:
         pnl = current_price - avg_price_bg
         pnl_percent = (pnl / avg_price_bg) * 100.0
-        print(f"[BG] current: {current_price:.3f}, avg: {avg_price_bg:.3f}, pnl: {pnl_percent:.3f}%")
+        print(f"[BG] current_price: ${current_price:.3f}, avg_price: ${avg_price_bg:.3f}, pnl: {pnl_percent:.3f}%")
     else:
         print("[BG] no buy history")
+
 
 
 ##############################################
@@ -781,22 +782,22 @@ test_run = run_tests
 
 while True:
     print("\nSelect action:")
-    print("1.test 2.wal 3.BN 4.BB buy 5.BB sell 6.BG buy 7.BG sell 8.exit")
-    print("Or use 'buy.COIN.AMOUNT', 'sell.COIN', 'fills.COIN', 'pnl.COIN' commands")
+    print("1.test 2.BN 3.BB buy 4.BB sell 5.BG buy 6.BG sell 7.exit")
+    print("Or use 'buy.COIN.value', 'sell.COIN', 'show_trx.COIN', 'show_pnl.COIN', 'show_bal' commands")
     cmd = input("Input: ").strip()
 
     if cmd.startswith("buy."):
         parts = cmd.split(".")
         if len(parts) == 3:
             c = parts[1]
-            usdt_str = parts[2]
+            value_str = parts[2]
             try:
-                ua = float(usdt_str)
-                buy_all(c, ua)
+                value = float(value_str)
+                buy_all(c, value)
             except:
-                print("invalid amount")
+                print("invalid value")
         else:
-            print("format: buy.COIN.USDT_AMOUNT")
+            print("format: buy.COIN.value")
         continue
 
     if cmd.startswith("sell."):
@@ -808,50 +809,105 @@ while True:
             print("format: sell.COIN")
         continue
 
-    if cmd.startswith("fills."):
+    if cmd.startswith("show_trx."):
         parts = cmd.split(".")
         if len(parts) == 2:
             c = parts[1]
-            print(f"=== Binance fills (CR) [{c.upper()}] ===")
+            print(f"=== Binance show_trx (CR) [{c.upper()}] ===")
             cr_trades = get_recent_trades_raw(binance_client_cr, c)
             print_trade_history(cr_trades)
 
-            print(f"=== Binance fills (LILAC) [{c.upper()}] ===")
+            print(f"=== Binance show_trx (LILAC) [{c.upper()}] ===")
             lilac_trades = get_recent_trades_raw(binance_client_lilac, c)
             print_trade_history(lilac_trades)
 
-            print(f"=== Binance fills (EX) [{c.upper()}] ===")
+            print(f"=== Binance show_trx (EX) [{c.upper()}] ===")
             ex_trades = get_recent_trades_raw(binance_client_ex, c)
             print_trade_history(ex_trades)
 
-            print(f"=== Bybit fills [{c.upper()}] ===")
+            print(f"=== Bybit show_trx [{c.upper()}] ===")
             bb_trades = get_recent_bybit_trades_raw(c)
             print_trade_history(bb_trades)
 
-            print(f"=== Bitget fills [{c.upper()}] ===")
+            print(f"=== Bitget show_trx [{c.upper()}] ===")
             bg_trades = get_recent_bg_trades_raw(c)
             print_trade_history(bg_trades)
         else:
-            print("format: fills.COIN")
+            print("format: show_trx.COIN")
         continue
 
-    if cmd.startswith("pnl."):
+    if cmd.startswith("show_pnl."):
         parts = cmd.split(".")
         if len(parts) == 2:
             c = parts[1]
             show_profit_loss_per_account(c)
         else:
-            print("format: pnl.COIN")
+            print("format: show_pnl.COIN")
         continue
+
+    if cmd.startswith("show_bal"):
+        print("\n=== All Wallet Balances ===\n")
+
+        print("=== Binance Spot Balances (3acc) ===")
+        get_spot_balance_all()
+        print()
+
+        print("=== Bybit Unified Balances (1acc) ===")
+        try:
+            response = bybit_client.get_wallet_balance(accountType="UNIFIED")
+            if response['retCode'] == 0:
+                coins_found = False
+                for account_item in response['result']['list']:
+                    for c in account_item['coin']:
+                        wallet_balance = float(c.get('walletBalance', 0))
+                        if wallet_balance > 0:
+                            print(f"{c['coin']}: balance: {wallet_balance}")
+                            coins_found = True
+                if not coins_found:
+                    print("no balance")
+            else:
+                print(f"balance query failed: {response['retMsg']}")
+        except Exception as e:
+            print(f"error: {e}")
+        print()
+
+        print("=== Bitget Spot Balances (1acc) ===")
+        try:
+            res = check_spot_balance()
+            if res and res.get("code") == "00000":
+                data = res.get("data", [])
+                if not data:
+                    print("no balance")
+                else:
+                    coins_found = False
+                    for b in data:
+                        coin = b.get("coin")
+                        available = float(b.get("available", 0))
+                        if available > 0:
+                            print(f"{coin}: available: {available}")
+                            coins_found = True
+                    if not coins_found:
+                        print("no balance")
+            else:
+                print("Bitget balance query failed")
+        except Exception as e:
+            print(f"error: {e}")
+
+        print("\n=== Wallet balances end ===\n")
+        continue
+
+    coin_input = input("BG (sell) all coin: ").strip()
+    if coin_input:
+        order_data = bitget_sell_all_coin_raw(coin_input)
+        print(order_data)
+    else:
+        print("no coin, cancel")
 
     if cmd == '1':
         if test_run:
             test_run()
 
     elif cmd == '2':
-        check_all_balances()
-
-    elif cmd == '3':
         print("Select BN account: 1(CR), 2(LILAC), 3(EX)")
         bn_acc_choice = input("Input: ").strip().lower()
         if bn_acc_choice in ['1', 'cr']:
@@ -893,7 +949,7 @@ while True:
         else:
             print("invalid selection, cancel")
 
-    elif cmd == '4':
+    elif cmd == '3':
         resp = bybit_client.get_wallet_balance(accountType="UNIFIED")
         if resp['retCode'] == 0:
             coins_found = False
@@ -923,7 +979,7 @@ while True:
         order_data = buy_bybit_coin_usdt_raw(coin_input, usdt_amount)
         print(order_data)
 
-    elif cmd == '5':
+    elif cmd == '4':
         resp = bybit_client.get_wallet_balance(accountType="UNIFIED")
         if resp['retCode'] == 0:
             coins_found = False
@@ -945,7 +1001,7 @@ while True:
         else:
             print("no coin, cancel")
 
-    elif cmd == '6':
+    elif cmd == '5':
         res = check_spot_balance()
         if res and res.get("code") == "00000":
             data = res.get("data", [])
@@ -980,7 +1036,7 @@ while True:
         order_data = bitget_buy_coin_usdt_raw(coin_input, usdt_amount)
         print(order_data)
 
-    elif cmd == '7':
+    elif cmd == '6':
         res = check_spot_balance()
         if res and res.get("code") == "00000":
             data = res.get("data", [])
@@ -1007,7 +1063,8 @@ while True:
         else:
             print("no coin, cancel")
 
-    elif cmd == '8':
+
+    elif cmd == '7':
         print("Exiting program.")
         break
     else:
