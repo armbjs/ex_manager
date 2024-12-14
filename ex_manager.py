@@ -50,6 +50,7 @@ try:
     from urllib.parse import urlencode
     import hmac
     import hashlib
+    import datetime
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
@@ -103,7 +104,6 @@ except Exception:
 try:
     from binance.client import Client
     from binance.enums import *
-    import datetime
 
     binance_client_cr = Client(BINANCE_API_KEY_CR, BINANCE_API_SECRET_CR)
     binance_client_lilac = Client(BINANCE_API_KEY_LILAC, BINANCE_API_SECRET_LILAC)
@@ -192,7 +192,6 @@ try:
         except Exception as e:
             return {"error": str(e)}
 
-    # 추가: 체결내역 조회 함수
     def get_recent_trades_raw(client, coin):
         try:
             symbol = (coin.upper() + "USDT")
@@ -200,30 +199,6 @@ try:
             return trades
         except Exception as e:
             return {"error": str(e)}
-
-    def print_trade_history(trades):
-        # trades는 get_recent_trades_raw 로 가져온 리스트 형태의 체결내역
-        # 각 항목 예: {'symbol': 'AVAUSDT', 'id': 38642971, 'orderId': ..., 'price': '3.09400000', 'qty': '27.50000000', ... 'time': 1720076234988, 'isBuyer': True/False, ...}
-        
-        if isinstance(trades, dict) and trades.get("error"):
-            # 에러 발생 시 에러 메세지 출력
-            print(trades)
-            return
-
-        if not trades or len(trades) == 0:
-            print("체결내역이 없습니다.")
-            return
-
-        for t in trades:
-            # 시간 변환
-            trade_time = datetime.datetime.fromtimestamp(t['time'] / 1000.0)
-            side = "bid" if t['isBuyer'] else "ask"
-            coin_name = t['symbol'].replace("USDT", "")  # 'AVAUSDT' -> 'AVA'
-            qty = t['qty']
-            price = t['price']
-
-            # 원하는 형식으로 출력
-            print(f"{trade_time} {side} {qty} {coin_name} at {price}")
 
 except Exception:
     pass
@@ -503,6 +478,28 @@ def bitget_sell_all_coin_raw(coin):
 
 
 ##############################################
+# 체결내역 출력 함수
+##############################################
+def print_trade_history(trades):
+    if isinstance(trades, dict) and trades.get("error"):
+        # 에러 발생 시 에러 메세지 출력
+        print(trades)
+        return
+
+    if not trades or len(trades) == 0:
+        print("체결내역이 없습니다.")
+        return
+
+    for t in trades:
+        trade_time = datetime.datetime.fromtimestamp(t['time'] / 1000.0)
+        side = "bid" if t['isBuyer'] else "ask"
+        coin_name = t['symbol'].replace("USDT", "")
+        qty = t['qty']
+        price = t['price']
+        print(f"{trade_time} {side} {qty} {coin_name} at {price}")
+
+
+##############################################
 # 전체 잔고 조회 함수
 ##############################################
 def check_all_balances():
@@ -598,6 +595,55 @@ def sell_all(coin):
 
 
 ##############################################
+# 손익평가 (계정별)
+##############################################
+def get_current_price(coin):
+    symbol = coin.upper() + "USDT"
+    ticker = binance_client_cr.get_symbol_ticker(symbol=symbol)
+    return float(ticker['price'])
+
+def calculate_account_avg_buy_price(client, coin):
+    trades = get_recent_trades_raw(client, coin)
+    if isinstance(trades, dict) and trades.get("error"):
+        return None
+    if not isinstance(trades, list):
+        return None
+
+    total_qty = 0.0
+    total_cost = 0.0
+    for t in trades:
+        if t.get('isBuyer'):
+            trade_price = float(t['price'])
+            trade_qty = float(t['qty'])
+            total_cost += trade_price * trade_qty
+            total_qty += trade_qty
+
+    if total_qty > 0:
+        avg_price = total_cost / total_qty
+        return avg_price
+    else:
+        return None
+
+def show_profit_loss_per_account(coin):
+    accounts = [
+        (binance_client_cr, "CR"),
+        (binance_client_lilac, "LILAC"),
+        (binance_client_ex, "EX")
+    ]
+
+    current_price = get_current_price(coin)
+
+    for client, acc_name in accounts:
+        avg_price = calculate_account_avg_buy_price(client, coin)
+        if avg_price is not None:
+            pnl = current_price - avg_price
+            pnl_percent = (pnl / avg_price) * 100.0
+            print(f"[{acc_name} 계정] 현재가: {current_price:.3f}, 매수평단가: {avg_price:.3f}, 손익: {pnl_percent:.3f}% (현재가 - 매수평단가 비율)")
+        else:
+            print(f"[{acc_name} 계정] 매수내역이 없어 평단가를 계산할 수 없습니다.")
+
+
+##############################################
 # 메인 로직
 ##############################################
 test_run = run_tests
@@ -605,7 +651,7 @@ test_run = run_tests
 while True:
     print("\n프로그램 실행 시 동작할 기능을 입력하시오")
     print("1.테스트 2.지갑조회 3.BN 4.BB매수 5.BB매도 6.BG매수 7.BG매도 8.종료")
-    print("또는 '전체매수.XRP.20', '전체매도.XRP', '체결조회.XRP' 형태로 명령 가능")
+    print("또는 '전체매수.XRP.20', '전체매도.XRP', '체결조회.XRP', '손익평가.XRP' 형태로 명령 가능")
     choice = input("입력: ").strip()
 
     if choice.startswith("전체매수."):
@@ -631,12 +677,10 @@ while True:
             print("전체매도 명령 형식: 전체매도.COIN")
         continue
 
-    # 체결조회 명령 처리
     if choice.startswith("체결조회."):
         parts = choice.split(".")
         if len(parts) == 2:
             c = parts[1]
-            # BN 3계정 모두 체결내역 조회 및 깔끔한 출력
             print(f"=== Binance 체결내역 조회 (CR 계정) [{c.upper()}] ===")
             cr_trades = get_recent_trades_raw(binance_client_cr, c)
             print_trade_history(cr_trades)
@@ -650,6 +694,15 @@ while True:
             print_trade_history(ex_trades)
         else:
             print("체결조회 명령 형식: 체결조회.COIN")
+        continue
+
+    if choice.startswith("손익평가."):
+        parts = choice.split(".")
+        if len(parts) == 2:
+            c = parts[1]
+            show_profit_loss_per_account(c)
+        else:
+            print("손익평가 명령 형식: 손익평가.COIN")
         continue
 
     if choice == '1':
@@ -702,7 +755,6 @@ while True:
             print("유효한 선택을 하지 않아 거래를 취소합니다.")
 
     elif choice == '4':
-        # BB 매수
         resp = bybit_client.get_wallet_balance(accountType="UNIFIED")
         if resp['retCode'] == 0:
             coins_found = False
@@ -733,7 +785,6 @@ while True:
         print(order_data)
 
     elif choice == '5':
-        # BB 매도
         resp = bybit_client.get_wallet_balance(accountType="UNIFIED")
         if resp['retCode'] == 0:
             coins_found = False
@@ -756,7 +807,6 @@ while True:
             print("코인명을 입력하지 않아 매도를 취소합니다.")
 
     elif choice == '6':
-        # BG 매수
         res = check_spot_balance()
         if res and res.get("code") == "00000":
             data = res.get("data", [])
@@ -792,7 +842,6 @@ while True:
         print(order_data)
 
     elif choice == '7':
-        # BG 매도
         res = check_spot_balance()
         if res and res.get("code") == "00000":
             data = res.get("data", [])
