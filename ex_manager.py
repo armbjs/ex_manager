@@ -110,7 +110,7 @@ try:
     binance_client_ex = Client(BINANCE_API_KEY_EX, BINANCE_API_SECRET_EX)
 
     def get_spot_balance_for_client(client, account_name):
-        print(f"\n=== Binance 스팟 지갑 잔고 ({account_name}) ===")
+        print(f"\n=== Binance Spot Wallet Balance ({account_name}) ===")
         try:
             account_info = client.get_account()
             balances = [
@@ -118,14 +118,14 @@ try:
                 if float(asset['free']) > 0 or float(asset['locked']) > 0
             ]
             if not balances:
-                print("잔고가 없습니다.")
+                print("No balance.")
             for balance_item in balances:
                 coin_name = balance_item['asset']
                 free_amount = float(balance_item['free'])
                 locked_amount = float(balance_item['locked'])
-                print(f"{coin_name}: 사용 가능: {free_amount}, 잠금: {locked_amount}")
+                print(f"{coin_name}: available: {free_amount}, locked: {locked_amount}")
         except Exception as e:
-            print(f"에러 발생 ({account_name}): {e}")
+            print(f"Error ({account_name}): {e}")
 
     def get_spot_balance_all():
         get_spot_balance_for_client(binance_client_cr, "CR")
@@ -210,7 +210,7 @@ try:
         total_qty = 0.0
         total_cost = 0.0
         for t in trades:
-            if float(t['qty']) > 0 and t['isBuyer'] == True:
+            if float(t['qty']) > 0 and t['isBuyer']:
                 trade_price = float(t['price'])
                 trade_qty = float(t['qty'])
                 total_cost += trade_price * trade_qty
@@ -241,10 +241,10 @@ try:
     def get_symbol_filters(symbol):
         resp = bybit_client.get_instruments_info(category="spot", symbol=symbol)
         if resp['retCode'] != 0 or 'list' not in resp['result']:
-            raise Exception(f"심볼 정보 조회 실패: {resp.get('retMsg', 'Unknown error')}")
+            raise Exception(f"symbol info query failed: {resp.get('retMsg', 'Unknown error')}")
         instruments_list = resp['result']['list']
         if not instruments_list:
-            raise Exception("해당 심볼 정보를 찾을 수 없습니다.")
+            raise Exception("No symbol info found.")
 
         lot_size_filter = instruments_list[0].get('lotSizeFilter', {})
         min_qty = float(lot_size_filter.get('minOrderQty', 0))
@@ -401,7 +401,7 @@ try:
             return None
 
 except Exception as e:
-    print(f"Bybit 관련 코드에서 에러 발생: {e}")
+    print(f"Bybit related error: {e}")
 
 
 ##############################################
@@ -629,34 +629,33 @@ def show_profit_loss_per_account(coin):
 
     current_price = get_current_price(coin)
 
-    print("=== Binance 계정 손익평가 ===")
+    print("=== Binance PnL ===")
     for client, acc_name in binance_accounts:
         avg_price = calculate_account_avg_buy_price(client, coin)
         if avg_price is not None:
             pnl = current_price - avg_price
             pnl_percent = (pnl / avg_price) * 100.0
-            print(f"[BN-{acc_name} 계정] 현재가: {current_price:.3f}, 매수평단가: {avg_price:.3f}, 손익: {pnl_percent:.3f}% (현재가 - 매수평단가 비율)")
+            print(f"[BN-{acc_name}] current: {current_price:.3f}, avg: {avg_price:.3f}, pnl: {pnl_percent:.3f}%")
         else:
-            print(f"[BN-{acc_name} 계정] 매수내역이 없어 평단가를 계산할 수 없습니다.")
+            print(f"[BN-{acc_name}] no buy history")
 
     avg_price_bybit = calculate_bybit_avg_buy_price(coin)
-    print("=== Bybit 계정 손익평가 ===")
+    print("=== Bybit PnL ===")
     if avg_price_bybit is not None:
         pnl = current_price - avg_price_bybit
         pnl_percent = (pnl / avg_price_bybit) * 100.0
-        print(f"[BB 계정] 현재가: {current_price:.3f}, 매수평단가: {avg_price_bybit:.3f}, 손익: {pnl_percent:.3f}% (현재가 - 매수평단가 비율)")
+        print(f"[BB] current: {current_price:.3f}, avg: {avg_price_bybit:.3f}, pnl: {pnl_percent:.3f}%")
     else:
-        print("[BB 계정] 매수내역이 없어 평단가를 계산할 수 없습니다.")
+        print("[BB] no buy history")
 
-    # Bitget 계정 손익평가 추가
     avg_price_bg = calculate_bg_avg_buy_price(coin)
-    print("=== Bitget 계정 손익평가 ===")
+    print("=== Bitget PnL ===")
     if avg_price_bg is not None:
         pnl = current_price - avg_price_bg
         pnl_percent = (pnl / avg_price_bg) * 100.0
-        print(f"[BG 계정] 현재가: {current_price:.3f}, 매수평단가: {avg_price_bg:.3f}, 손익: {pnl_percent:.3f}% (현재가 - 매수평단가 비율)")
+        print(f"[BG] current: {current_price:.3f}, avg: {avg_price_bg:.3f}, pnl: {pnl_percent:.3f}%")
     else:
-        print("[BG 계정] 매수내역이 없어 평단가를 계산할 수 없습니다.")
+        print("[BG] no buy history")
 
 
 ##############################################
@@ -668,7 +667,7 @@ def print_trade_history(trades):
         return
 
     if not trades or len(trades) == 0:
-        print("체결내역이 없습니다.")
+        print("no fills.")
         return
 
     for t in trades:
@@ -684,13 +683,13 @@ def print_trade_history(trades):
 # 전체 잔고 조회 함수
 ##############################################
 def check_all_balances():
-    print("\n=== 전체 잔고 조회를 시작합니다. ===\n")
+    print("\n=== All Balances ===\n")
 
-    print("=== Binance Spot 잔고 조회 (3계정) ===")
+    print("=== Binance Spot Balances (3acc) ===")
     get_spot_balance_all()
     print()
 
-    print("=== Bybit Unified 잔고 조회 ===")
+    print("=== Bybit Unified Balances ===")
     try:
         response = bybit_client.get_wallet_balance(accountType="UNIFIED")
         if response['retCode'] == 0:
@@ -699,36 +698,36 @@ def check_all_balances():
                 for c in account_item['coin']:
                     wallet_balance = float(c.get('walletBalance', 0))
                     if wallet_balance > 0:
-                        print(f"{c['coin']}: 잔고: {wallet_balance}")
+                        print(f"{c['coin']}: balance: {wallet_balance}")
                         coins_found = True
             if not coins_found:
-                print("잔고가 없습니다.")
+                print("no balance")
         else:
-            print(f"잔고 조회 실패: {response['retMsg']}")
+            print(f"balance query failed: {response['retMsg']}")
     except Exception as e:
-        print(f"에러 발생: {e}")
+        print(f"error: {e}")
     print()
 
-    print("=== Bitget Spot 잔고 조회 ===")
+    print("=== Bitget Spot Balances ===")
     res = check_spot_balance()
     if res and res.get("code") == "00000":
         data = res.get("data", [])
         if not data:
-            print("잔고가 없습니다.")
+            print("no balance")
         else:
             coins_found = False
             for b in data:
                 coin = b.get("coin")
                 available = b.get("available")
                 if float(available) > 0:
-                    print(f"{coin}: 사용 가능: {available}")
+                    print(f"{coin}: available: {available}")
                     coins_found = True
             if not coins_found:
-                print("잔고가 없습니다.")
+                print("no balance")
     else:
-        print("Bitget 잔고 조회 실패")
+        print("Bitget balance query failed")
 
-    print("\n=== 전체 잔고 조회를 마쳤습니다. ===\n")
+    print("\n=== All balances end ===\n")
 
 
 ##############################################
@@ -742,12 +741,12 @@ def buy_all(coin, usdt_amount):
     bb_result = buy_bybit_coin_usdt_raw(coin, usdt_amount)
     bg_result = bitget_buy_coin_usdt_raw(coin, usdt_amount)
 
-    print("=== 전체매수 결과 ===")
-    print("[BN - CR 계정]")
+    print("=== buy results ===")
+    print("[BN - CR]")
     print(bn_cr_result)
-    print("[BN - LILAC 계정]")
+    print("[BN - LILAC]")
     print(bn_lilac_result)
-    print("[BN - EX 계정]")
+    print("[BN - EX]")
     print(bn_ex_result)
     print("[BB]")
     print(bb_result)
@@ -762,12 +761,12 @@ def sell_all(coin):
     bb_result = sell_all_bybit_coin_raw(coin)
     bg_result = bitget_sell_all_coin_raw(coin)
 
-    print("=== 전체매도 결과 ===")
-    print("[BN - CR 계정]")
+    print("=== sell results ===")
+    print("[BN - CR]")
     print(bn_cr_result)
-    print("[BN - LILAC 계정]")
+    print("[BN - LILAC]")
     print(bn_lilac_result)
-    print("[BN - EX 계정]")
+    print("[BN - EX]")
     print(bn_ex_result)
     print("[BB]")
     print(bb_result)
@@ -781,13 +780,13 @@ def sell_all(coin):
 test_run = run_tests
 
 while True:
-    print("\n프로그램 실행 시 동작할 기능을 입력하시오")
-    print("1.테스트 2.지갑조회 3.BN 4.BB매수 5.BB매도 6.BG매수 7.BG매도 8.종료")
-    print("또는 '전체매수.XRP.20', '전체매도.XRP', '체결조회.XRP', '손익평가.XRP' 형태로 명령 가능")
-    choice = input("입력: ").strip()
+    print("\nSelect action:")
+    print("1.test 2.wal 3.BN 4.BB buy 5.BB sell 6.BG buy 7.BG sell 8.exit")
+    print("Or use 'buy.COIN.AMOUNT', 'sell.COIN', 'fills.COIN', 'pnl.COIN' commands")
+    cmd = input("Input: ").strip()
 
-    if choice.startswith("전체매수."):
-        parts = choice.split(".")
+    if cmd.startswith("buy."):
+        parts = cmd.split(".")
         if len(parts) == 3:
             c = parts[1]
             usdt_str = parts[2]
@@ -795,69 +794,66 @@ while True:
                 ua = float(usdt_str)
                 buy_all(c, ua)
             except:
-                print("수량이 유효하지 않습니다.")
+                print("invalid amount")
         else:
-            print("전체매수 명령 형식: 전체매수.COIN.USDT_AMOUNT")
+            print("format: buy.COIN.USDT_AMOUNT")
         continue
 
-    if choice.startswith("전체매도."):
-        parts = choice.split(".")
+    if cmd.startswith("sell."):
+        parts = cmd.split(".")
         if len(parts) == 2:
             c = parts[1]
             sell_all(c)
         else:
-            print("전체매도 명령 형식: 전체매도.COIN")
+            print("format: sell.COIN")
         continue
 
-    if choice.startswith("체결조회."):
-        parts = choice.split(".")
+    if cmd.startswith("fills."):
+        parts = cmd.split(".")
         if len(parts) == 2:
             c = parts[1]
-            # Binance 3계정
-            print(f"=== Binance 체결내역 조회 (CR 계정) [{c.upper()}] ===")
+            print(f"=== Binance fills (CR) [{c.upper()}] ===")
             cr_trades = get_recent_trades_raw(binance_client_cr, c)
             print_trade_history(cr_trades)
 
-            print(f"=== Binance 체결내역 조회 (LILAC 계정) [{c.upper()}] ===")
+            print(f"=== Binance fills (LILAC) [{c.upper()}] ===")
             lilac_trades = get_recent_trades_raw(binance_client_lilac, c)
             print_trade_history(lilac_trades)
 
-            print(f"=== Binance 체결내역 조회 (EX 계정) [{c.upper()}] ===")
+            print(f"=== Binance fills (EX) [{c.upper()}] ===")
             ex_trades = get_recent_trades_raw(binance_client_ex, c)
             print_trade_history(ex_trades)
 
-            # Bybit 체결내역
-            print(f"=== Bybit 체결내역 조회 [{c.upper()}] ===")
+            print(f"=== Bybit fills [{c.upper()}] ===")
             bb_trades = get_recent_bybit_trades_raw(c)
             print_trade_history(bb_trades)
 
-            # Bitget 체결내역 추가
-            print(f"=== Bitget 체결내역 조회 [{c.upper()}] ===")
+            print(f"=== Bitget fills [{c.upper()}] ===")
             bg_trades = get_recent_bg_trades_raw(c)
             print_trade_history(bg_trades)
         else:
-            print("체결조회 명령 형식: 체결조회.COIN")
+            print("format: fills.COIN")
         continue
 
-    if choice.startswith("손익평가."):
-        parts = choice.split(".")
+    if cmd.startswith("pnl."):
+        parts = cmd.split(".")
         if len(parts) == 2:
             c = parts[1]
             show_profit_loss_per_account(c)
         else:
-            print("손익평가 명령 형식: 손익평가.COIN")
+            print("format: pnl.COIN")
         continue
 
-    if choice == '1':
+    if cmd == '1':
         if test_run:
             test_run()
 
-    elif choice == '2':
+    elif cmd == '2':
         check_all_balances()
 
-    elif choice == '3':
-        print("BN 계정을 선택해주세요: 1(CR), 2(LILAC), 3(EX)")
-        bn_acc_choice = input("입력: ").strip().lower()
+    elif cmd == '3':
+        print("Select BN account: 1(CR), 2(LILAC), 3(EX)")
+        bn_acc_choice = input("Input: ").strip().lower()
         if bn_acc_choice in ['1', 'cr']:
             bn_client = (binance_client_cr, "CR")
         elif bn_acc_choice in ['2', 'lilac']:
@@ -865,39 +861,39 @@ while True:
         elif bn_acc_choice in ['3', 'ex']:
             bn_client = (binance_client_ex, "EX")
         else:
-            print("유효한 BN 계정을 입력하지 않아 거래를 취소합니다.")
+            print("invalid BN account")
             continue
 
-        print(f"BN거래소[{bn_client[1]} 계정]를 선택했습니다. 1(매수), 2(매도)")
-        action_choice = input("입력: ").strip()
+        print(f"Selected BN[{bn_client[1]}]. 1(buy), 2(sell)")
+        action_choice = input("Input: ").strip()
 
         if action_choice == '1':
             get_spot_balance_for_client(bn_client[0], bn_client[1])
-            coin_input = input(f"{bn_client[1]} 계정 매수할 코인명: ").strip()
+            coin_input = input(f"{bn_client[1]} buy coin: ").strip()
             if not coin_input:
-                print("코인명을 입력하지 않아 매수를 취소합니다.")
+                print("no coin, cancel")
                 continue
             try:
-                usdt_str = input(f"{coin_input.upper()} 매수할 USDT 수량: ").strip()
+                usdt_str = input(f"{coin_input.upper()} buy USDT amount: ").strip()
                 usdt_amount = float(usdt_str)
             except:
-                print("유효한 수량을 입력하지 않아 매수를 취소합니다.")
+                print("invalid amount, cancel")
                 continue
             order_data = buy_binance_coin_usdt_raw(bn_client[0], coin_input, usdt_amount)
             print(order_data)
 
         elif action_choice == '2':
             get_spot_balance_for_client(bn_client[0], bn_client[1])
-            coin_input = input(f"{bn_client[1]} 계정 전액 매도할 코인명: ").strip()
+            coin_input = input(f"{bn_client[1]} sell all coin: ").strip()
             if coin_input:
                 order_data = sell_all_binance_coin_raw(bn_client[0], coin_input)
                 print(order_data)
             else:
-                print("코인명을 입력하지 않아 매도를 취소합니다.")
+                print("no coin, cancel")
         else:
-            print("유효한 선택을 하지 않아 거래를 취소합니다.")
+            print("invalid selection, cancel")
 
-    elif choice == '4':
+    elif cmd == '4':
         resp = bybit_client.get_wallet_balance(accountType="UNIFIED")
         if resp['retCode'] == 0:
             coins_found = False
@@ -905,29 +901,29 @@ while True:
                 for c in account_item['coin']:
                     wbal = float(c.get('walletBalance', 0))
                     if wbal > 0:
-                        print(f"{c['coin']}: 잔고: {wbal}")
+                        print(f"{c['coin']}: balance: {wbal}")
                         coins_found = True
             if not coins_found:
-                print("잔고가 없습니다.")
+                print("no balance")
         else:
-            print(f"잔고 조회 실패: {resp['retMsg']}")
+            print(f"balance check failed: {resp['retMsg']}")
 
-        coin_input = input("BB거래소(매수) 매수할 코인명: ").strip()
+        coin_input = input("BB (buy) coin: ").strip()
         if not coin_input:
-            print("코인명을 입력하지 않아 매수를 취소합니다.")
+            print("no coin, cancel")
             continue
 
         try:
-            usdt_str = input(f"{coin_input.upper()} 매수할 USDT 수량: ").strip()
+            usdt_str = input(f"{coin_input.upper()} buy USDT amount: ").strip()
             usdt_amount = float(usdt_str)
         except:
-            print("유효한 수량을 입력하지 않아 매수를 취소합니다.")
+            print("invalid amount, cancel")
             continue
 
         order_data = buy_bybit_coin_usdt_raw(coin_input, usdt_amount)
         print(order_data)
 
-    elif choice == '5':
+    elif cmd == '5':
         resp = bybit_client.get_wallet_balance(accountType="UNIFIED")
         if resp['retCode'] == 0:
             coins_found = False
@@ -935,84 +931,84 @@ while True:
                 for c in account_item['coin']:
                     wbal = float(c.get('walletBalance', 0))
                     if wbal > 0:
-                        print(f"{c['coin']}: 잔고: {wbal}")
+                        print(f"{c['coin']}: balance: {wbal}")
                         coins_found = True
             if not coins_found:
-                print("잔고가 없습니다.")
+                print("no balance")
         else:
-            print(f"잔고 조회 실패: {resp['retMsg']}")
+            print(f"balance check failed: {resp['retMsg']}")
 
-        coin_input = input("BB거래소(매도) 전액 매도할 코인명: ").strip()
+        coin_input = input("BB (sell) all coin: ").strip()
         if coin_input:
             order_data = sell_all_bybit_coin_raw(coin_input)
             print(order_data)
         else:
-            print("코인명을 입력하지 않아 매도를 취소합니다.")
+            print("no coin, cancel")
 
-    elif choice == '6':
+    elif cmd == '6':
         res = check_spot_balance()
         if res and res.get("code") == "00000":
             data = res.get("data", [])
-            print("\n=== Bitget Spot 지갑 잔고 ===")
+            print("\n=== Bitget Spot Balances ===")
             if not data:
-                print("잔고가 없습니다.")
+                print("no balance")
             else:
                 coins_found = False
                 for b in data:
                     c_name = b.get("coin")
                     av = b.get("available")
                     if float(av) > 0:
-                        print(f"{c_name}: 사용 가능: {av}")
+                        print(f"{c_name}: available: {av}")
                         coins_found = True
                 if not coins_found:
-                    print("잔고가 없습니다.")
+                    print("no balance")
         else:
-            print("Bitget 잔고 조회 실패")
+            print("Bitget balance check failed")
 
-        coin_input = input("BG거래소(매수) 매수할 코인명: ").strip()
+        coin_input = input("BG (buy) coin: ").strip()
         if not coin_input:
-            print("코인명을 입력하지 않아 매수를 취소합니다.")
+            print("no coin, cancel")
             continue
 
         try:
-            usdt_str = input(f"{coin_input.upper()} 매수할 USDT 수량: ").strip()
+            usdt_str = input(f"{coin_input.upper()} buy USDT amount: ").strip()
             usdt_amount = float(usdt_str)
         except:
-            print("유효한 수량을 입력하지 않아 매수를 취소합니다.")
+            print("invalid amount, cancel")
             continue
 
         order_data = bitget_buy_coin_usdt_raw(coin_input, usdt_amount)
         print(order_data)
 
-    elif choice == '7':
+    elif cmd == '7':
         res = check_spot_balance()
         if res and res.get("code") == "00000":
             data = res.get("data", [])
-            print("\n=== Bitget Spot 지갑 잔고 ===")
+            print("\n=== Bitget Spot Balances ===")
             if not data:
-                print("잔고가 없습니다.")
+                print("no balance")
             else:
                 coins_found = False
                 for b in data:
                     c_name = b.get("coin")
                     av = b.get("available")
                     if float(av) > 0:
-                        print(f"{c_name}: 사용 가능: {av}")
+                        print(f"{c_name}: available: {av}")
                         coins_found = True
                 if not coins_found:
-                    print("잔고가 없습니다.")
+                    print("no balance")
         else:
-            print("Bitget 잔고 조회 실패")
+            print("Bitget balance check failed")
 
-        coin_input = input("BG거래소(매도) 전액 매도할 코인명: ").strip()
+        coin_input = input("BG (sell) all coin: ").strip()
         if coin_input:
             order_data = bitget_sell_all_coin_raw(coin_input)
             print(order_data)
         else:
-            print("코인명을 입력하지 않아 매도를 취소합니다.")
+            print("no coin, cancel")
 
-    elif choice == '8':
-        print("프로그램을 종료합니다.")
+    elif cmd == '8':
+        print("Exiting program.")
         break
     else:
-        print("해당 기능을 찾을 수 없습니다. (1=테스트/2=지갑조회/3=BN/4=BB매수/5=BB매도/6=BG매수/7=BG매도/8=종료)")
+        print("No such feature. (1=test/2=wal/3=BN/4=BB buy/5=BB sell/6=BG buy/7=BG sell/8=exit)")
