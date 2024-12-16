@@ -396,6 +396,16 @@ def calculate_bybit_avg_buy_price(coin):
         return avg_price
     else:
         return None
+    
+def get_current_price_bybit(coin):
+    symbol = coin.upper() + "USDT"
+    resp = bybit_client.get_tickers(category="spot", symbol=symbol)
+    if resp.get("retCode") == 0:
+        ticker_list = resp.get("result", {}).get("list", [])
+        if ticker_list and "lastPrice" in ticker_list[0]:
+            return float(ticker_list[0]["lastPrice"])
+    # 조회 실패 시 예외 발생
+    raise Exception(f"Failed to fetch Bybit current price for {symbol}")
 
 
 ##############################################
@@ -606,6 +616,17 @@ def calculate_bg_avg_buy_price(coin):
     else:
         return None
 
+def get_current_price_bitget(coin):
+    symbol = coin.upper() + "USDT"
+    endpoint = "/api/v2/spot/market/tickers"
+    params = {"symbol": symbol}
+    resp = send_request("GET", endpoint, params=params, need_auth=False)
+    if resp.get("code") == "00000":
+        data_list = resp.get("data", [])
+        if data_list and "lastPr" in data_list[0]:
+            last_price_str = data_list[0]["lastPr"]
+            return float(last_price_str)
+    raise Exception(f"Failed to fetch Bitget current price for {symbol}")
 
 ##############################################
 # 손익평가
@@ -617,46 +638,88 @@ def get_current_price(coin):
 
 def show_profit_loss_per_account(coin):
     print("=== PnL Calculation ===\n")
-    current_price = get_current_price(coin)
-    print(f"current_price: {current_price}\n")
+    
+    # Binance 현재가 (기존 로직)
+    try:
+        current_price_binance = get_current_price(coin)
+        print(f"Binance current_price: {current_price_binance}\n")
+    except Exception as e:
+        print(f"Failed to fetch Binance current price for {coin}: {e}\n")
+        current_price_binance = None
 
+    # Bybit 현재가 (이미 앞선 단계에서 구현했다고 가정)
+    try:
+        current_price_bybit = get_current_price_bybit(coin)
+        print(f"Bybit current_price: {current_price_bybit}\n")
+    except Exception as e:
+        print(f"Failed to fetch Bybit current price for {coin}: {e}\n")
+        current_price_bybit = None
+
+    # Bitget 현재가
+    try:
+        current_price_bitget = get_current_price_bitget(coin)
+        print(f"Bitget current_price: {current_price_bitget}\n")
+    except Exception as e:
+        print(f"Failed to fetch Bitget current price for {coin}: {e}\n")
+        current_price_bitget = None
+
+
+    # Binance PnL 계산
+    print("=== Binance PnL ===\n")
     binance_accounts = [
         (binance_client_cr, "CR"),
         (binance_client_lilac, "LILAC"),
         (binance_client_ex, "EX")
     ]
-
-    print("=== Binance PnL ===\n")
     for client, acc_name in binance_accounts:
-        avg_price = calculate_account_avg_buy_price(client, coin)
-        if avg_price is not None:
-            pnl = current_price - avg_price
-            pnl_percent = (pnl / avg_price) * 100.0
-            print(f"[BN-{acc_name}] current_price: ${current_price:.3f}, avg_price: ${avg_price:.3f}, pnl: {pnl_percent:.3f}%")
-        else:
-            print(f"[BN-{acc_name}] no buy history")
+        try:
+            avg_price = calculate_account_avg_buy_price(client, coin)
+            if avg_price is not None and current_price_binance is not None:
+                pnl = current_price_binance - avg_price
+                pnl_percent = (pnl / avg_price) * 100.0
+                print(f"[BN-{acc_name}] current_price: ${current_price_binance:.3f}, avg_price: ${avg_price:.3f}, pnl: {pnl_percent:.3f}%")
+            else:
+                if avg_price is None:
+                    print(f"[BN-{acc_name}] no buy history")
+                else:
+                    print(f"[BN-{acc_name}] current price unavailable")
+        except Exception as e:
+            print(f"[BN-{acc_name}] Error calculating PnL: {e}")
     print()
 
-    avg_price_bybit = calculate_bybit_avg_buy_price(coin)
+    # Bybit PnL 계산
     print("=== Bybit PnL ===\n")
-    if avg_price_bybit is not None:
-        pnl = current_price - avg_price_bybit
-        pnl_percent = (pnl / avg_price_bybit) * 100.0
-        print(f"[BB] current_price: ${current_price:.3f}, avg_price: ${avg_price_bybit:.3f}, pnl: {pnl_percent:.3f}%")
-    else:
-        print("[BB] no buy history")
+    try:
+        avg_price_bybit = calculate_bybit_avg_buy_price(coin)
+        if avg_price_bybit is not None and current_price_bybit is not None:
+            pnl = current_price_bybit - avg_price_bybit
+            pnl_percent = (pnl / avg_price_bybit) * 100.0
+            print(f"[BB] current_price: ${current_price_bybit:.3f}, avg_price: ${avg_price_bybit:.3f}, pnl: {pnl_percent:.3f}%")
+        else:
+            if avg_price_bybit is None:
+                print("[BB] no buy history")
+            else:
+                print("[BB] current price unavailable")
+    except Exception as e:
+        print(f"[BB] Error calculating PnL: {e}")
     print()
 
-    avg_price_bg = calculate_bg_avg_buy_price(coin)
+    # Bitget PnL 계산
     print("=== Bitget PnL ===\n")
-    if avg_price_bg is not None:
-        pnl = current_price - avg_price_bg
-        pnl_percent = (pnl / avg_price_bg) * 100.0
-        print(f"[BG] current_price: ${current_price:.3f}, avg_price: ${avg_price_bg:.3f}, pnl: {pnl_percent:.3f}%")
-    else:
-        print("[BG] no buy history")
+    try:
+        avg_price_bg = calculate_bg_avg_buy_price(coin)
+        if avg_price_bg is not None and current_price_bitget is not None:
+            pnl = current_price_bitget - avg_price_bg
+            pnl_percent = (pnl / avg_price_bg) * 100.0
+            print(f"[BG] current_price: ${current_price_bitget:.3f}, avg_price: ${avg_price_bg:.3f}, pnl: {pnl_percent:.3f}%")
+        else:
+            if avg_price_bg is None:
+                print("[BG] no buy history")
+            else:
+                print("[BG] current price unavailable")
+    except Exception as e:
+        print(f"[BG] Error calculating PnL: {e}")
     print()
-
 
 ##############################################
 # 체결내역 출력 함수
