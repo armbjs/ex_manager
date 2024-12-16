@@ -929,7 +929,7 @@ class ExManager:
             elif text == "show_bal":
                 print(self.check_all_balances())
 
-            elif text == "명령어":
+            elif text in ["명령어", "help"]:
                 print("=== 사용 가능한 명령어 목록 ===\n")
                 for cmd, desc in self.COMMANDS_HELP:
                     print(f"{cmd} : {desc}")
@@ -941,4 +941,3 @@ class ExManager:
         finally:
             sys.stdout = old_stdout
         return buffer.getvalue()
-
