@@ -157,10 +157,11 @@ class ExManager:
         current_time = int(time.time() * 1000)
         coin_symbol = f"TST{current_time % 1000:03d}"
 
+        # UPBIT 형식의 영문 공지사항
         upbit_notice_en1 = {
             "type": "NOTICE",
             "action": "NEW",
-            "title": f"Market Support for {coin_symbol}(Tasdas), XRP(Ripple Network) (BTC, USDT Market)",
+            "title": f"Market Support for {coin_symbol}(TASDSDW), XRP(RIPPLE) (BTC, USDT Market)",
             "content": None,
             "exchange": "UPBIT",
             "url": "https://upbit.com/service_center/notice?id=4695",
@@ -169,13 +170,97 @@ class ExManager:
             "listedTs": current_time,
             "receivedTs": current_time + 100
         }
-
         upbit_notice_en1_json = json.dumps(upbit_notice_en1, ensure_ascii=False)
         self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_en1_json)
-        return f"Published UPBIT test notice for {coin_symbol}\n"
+        time.sleep(1)
 
-    def run_tests(self):
-        return "Executing test notices\n" + self.publish_test_notices()
+        # UPBIT 형식의 영문 공지사항 (코인 순서 변경)
+        upbit_notice_en2 = {
+            "type": "NOTICE",
+            "action": "NEW",
+            "title": f"Market Support for TASDSDW({coin_symbol}), RIPPLE(XRP) (BTC, USDT Market)",
+            "content": None,
+            "exchange": "UPBIT",
+            "url": "https://upbit.com/service_center/notice?id=4695",
+            "category": "Trade",
+            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            "listedTs": current_time,
+            "receivedTs": current_time + 100
+        }
+        upbit_notice_en2_json = json.dumps(upbit_notice_en2, ensure_ascii=False)
+        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_en2_json)
+        time.sleep(1)
+
+        # UPBIT 형식의 한글 공지사항 1
+        upbit_notice_kr1 = {
+            "type": "NOTICE",
+            "action": "NEW",
+            "title": f"{coin_symbol}(테스트코인), XRP(RIPPLE) 신규 거래지원 안내 (BTC, USDT 마켓)",
+            "content": None,
+            "exchange": "UPBIT",
+            "url": "https://upbit.com/service_center/notice?id=4695",
+            "category": "Trade",
+            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            "listedTs": current_time,
+            "receivedTs": current_time + 100
+        }
+        upbit_notice_kr1_json = json.dumps(upbit_notice_kr1, ensure_ascii=False)
+        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr1_json)
+        time.sleep(1)
+
+        # UPBIT 형식의 한글 공지사항 2
+        upbit_notice_kr2 = {
+            "type": "NOTICE",
+            "action": "NEW",
+            "title": f"테스트코인({coin_symbol}), 리플(XRP) 신규 거래지원 안내 (BTC, USDT 마켓)",
+            "content": None,
+            "exchange": "UPBIT",
+            "url": "https://upbit.com/service_center/notice?id=4695",
+            "category": "Trade",
+            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            "listedTs": current_time,
+            "receivedTs": current_time + 100
+        }
+        upbit_notice_kr2_json = json.dumps(upbit_notice_kr2, ensure_ascii=False)
+        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr2_json)
+        time.sleep(1)
+
+        # UPBIT 형식의 한글 공지사항 3
+        upbit_notice_kr3 = {
+            "type": "NOTICE",
+            "action": "NEW",
+            "title": f"테스트코인({coin_symbol}), 리플(XRP) KRW, USDT 마켓 디지털 자산 추가",
+            "content": None,
+            "exchange": "UPBIT",
+            "url": "https://upbit.com/service_center/notice?id=4695",
+            "category": "Trade",
+            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            "listedTs": current_time,
+            "receivedTs": current_time + 100
+        }
+        upbit_notice_kr3_json = json.dumps(upbit_notice_kr3, ensure_ascii=False)
+        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr3_json)
+        time.sleep(1)
+
+        # BITHUMB 형식의 공지사항
+        bithumb_notice = {
+            "type": "NOTICE",
+            "action": "NEW",
+            "title": f"[거래] {coin_symbol}(TestCoin), XRP(리플) 신규 거래지원 안내 (BTC, USDT 마켓)",
+            "content": None,
+            "exchange": "BITHUMB",
+            "url": "https://feed.bithumb.com/notice/1645287",
+            "category": None,
+            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            "listedTs": current_time,
+            "receivedTs": current_time + 100
+        }
+        bithumb_notice_json = json.dumps(bithumb_notice, ensure_ascii=False)
+        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, bithumb_notice_json)
+        time.sleep(1)
+
+        return f"Published multiple test notices for {coin_symbol}\n"
+
 
     ##############################################
     # Binance 관련 함수
@@ -888,7 +973,7 @@ class ExManager:
             print(f"Received command: {text}\n")
 
             if text == "notice_test":
-                print(self.run_tests())
+                print(self.publish_test_notices())
 
             elif text.startswith("buy."):
                 parts = text.split(".")
