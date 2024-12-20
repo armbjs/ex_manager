@@ -384,6 +384,11 @@ class ExManager:
         else:
             return None
 
+    def get_bid1_price_binance(self, coin):
+        symbol = coin.upper() + "USDT"
+        order_book = self.binance_client_cr.get_order_book(symbol=symbol)
+        return float(order_book['bids'][0][0])  # 최우선 매수 호가
+
     ##############################################
     # Bybit 관련 함수
     ##############################################
@@ -547,6 +552,15 @@ class ExManager:
             return avg_price
         else:
             return None
+
+    def get_bid1_price_bybit(self, coin):
+        symbol = coin.upper() + "USDT"
+        response = self.bybit_client.get_orderbook(category="spot", symbol=symbol)
+        if response.get("retCode") == 0:
+            if response['result'] and response['result']['b']:
+                return float(response['result']['b'][0][0])  # 최우선 매수 호가
+            raise Exception(f"No bid data for {symbol}")
+        raise Exception(f"Bybit API Error: {response.get('retMsg', 'Unknown error')}")
 
     ##############################################
     # Bitget 관련 함수
@@ -712,37 +726,50 @@ class ExManager:
         else:
             return None
 
+    def get_bid1_price_bitget(self, coin):
+        try:
+            symbol = coin.upper() + "USDT"
+            endpoint = "/api/v2/spot/market/orderbook"
+            params = {"symbol": symbol, "type": "step0", "limit": "1"}
+            response = self.send_request("GET", endpoint, params=params)
+            if response.get("code") == "00000" and response.get("data") and response['data']['bids']:
+                return float(response['data']['bids'][0][0])  # 최우선 매수 호가 반환
+            raise Exception(f"Bitget API Error: {response.get('msg', 'Unknown error')}")
+        except Exception as e:
+            raise Exception(f"Failed to fetch Bitget bid1 price for {coin.upper()}: {str(e)}")
+
+
     ##############################################
     # 손익평가
     ##############################################
     def show_profit_loss_per_account(self, coin):
         output = StringIO()
-        output.write("=== PnL Calculation ===\n\n")
+        output.write("=== PnL Calculation Based on bid1 ===\n\n")
 
-        current_price_binance = None
-        current_price_bybit = None
-        current_price_bitget = None
+        bid1_binance = None
+        bid1_bybit = None
+        bid1_bitget = None
 
-        # Binance current price
+        # Binance bid1 price
         try:
-            current_price_binance = self.get_current_price_binance(coin)
-            output.write(f"Binance current_price: {current_price_binance}\n\n")
+            bid1_binance = self.get_bid1_price_binance(coin)
+            output.write(f"Binance bid1 price: {bid1_binance}\n\n")
         except Exception as e:
-            output.write(f"Failed to fetch Binance current price for {coin}: {e}\n\n")
+            output.write(f"Failed to fetch Binance bid1 price for {coin}: {e}\n\n")
 
-        # Bybit current price
+        # Bybit bid1 price
         try:
-            current_price_bybit = self.get_current_price_bybit(coin)
-            output.write(f"Bybit current_price: {current_price_bybit}\n\n")
+            bid1_bybit = self.get_bid1_price_bybit(coin)
+            output.write(f"Bybit bid1 price: {bid1_bybit}\n\n")
         except Exception as e:
-            output.write(f"Failed to fetch Bybit current price for {coin}: {e}\n\n")
+            output.write(f"Failed to fetch Bybit bid1 price for {coin}: {e}\n\n")
 
-        # Bitget current price
+        # Bitget bid1 price
         try:
-            current_price_bitget = self.get_current_price_bitget(coin)
-            output.write(f"Bitget current_price: {current_price_bitget}\n\n")
+            bid1_bitget = self.get_bid1_price_bitget(coin)
+            output.write(f"Bitget bid1 price: {bid1_bitget}\n\n")
         except Exception as e:
-            output.write(f"Failed to fetch Bitget current price for {coin}: {e}\n\n")
+            output.write(f"Failed to fetch Bitget bid1 price for {coin}: {e}\n\n")
 
         output.write("=== Binance PnL ===\n\n")
         binance_accounts = [
@@ -753,15 +780,15 @@ class ExManager:
         for client, acc_name in binance_accounts:
             try:
                 avg_price = self.calculate_account_avg_buy_price(client, coin)
-                if avg_price is not None and current_price_binance is not None:
-                    pnl = current_price_binance - avg_price
+                if avg_price is not None and bid1_binance is not None:
+                    pnl = bid1_binance - avg_price
                     pnl_percent = (pnl / avg_price) * 100.0
-                    output.write(f"[BN-{acc_name}] current_price: ${current_price_binance:.3f}, avg_price: ${avg_price:.3f}, pnl: {pnl_percent:.3f}%\n")
+                    output.write(f"[BN-{acc_name}] bid1 price: ${bid1_binance:.3f}, avg_price: ${avg_price:.3f}, pnl: {pnl_percent:.3f}%\n")
                 else:
                     if avg_price is None:
                         output.write(f"[BN-{acc_name}] no buy history\n")
                     else:
-                        output.write(f"[BN-{acc_name}] current price unavailable\n")
+                        output.write(f"[BN-{acc_name}] bid1 price unavailable\n")
             except Exception as e:
                 output.write(f"[BN-{acc_name}] Error calculating PnL: {e}\n")
         output.write("\n")
@@ -769,15 +796,15 @@ class ExManager:
         output.write("=== Bybit PnL ===\n\n")
         try:
             avg_price_bybit = self.calculate_bybit_avg_buy_price(coin)
-            if avg_price_bybit is not None and current_price_bybit is not None:
-                pnl = current_price_bybit - avg_price_bybit
+            if avg_price_bybit is not None and bid1_bybit is not None:
+                pnl = bid1_bybit - avg_price_bybit
                 pnl_percent = (pnl / avg_price_bybit) * 100.0
-                output.write(f"[BB] current_price: ${current_price_bybit:.3f}, avg_price: ${avg_price_bybit:.3f}, pnl: {pnl_percent:.3f}%\n")
+                output.write(f"[BB] bid1 price: ${bid1_bybit:.3f}, avg_price: ${avg_price_bybit:.3f}, pnl: {pnl_percent:.3f}%\n")
             else:
                 if avg_price_bybit is None:
                     output.write("[BB] no buy history\n")
                 else:
-                    output.write("[BB] current price unavailable\n")
+                    output.write("[BB] bid1 price unavailable\n")
         except Exception as e:
             output.write(f"[BB] Error calculating PnL: {e}\n")
         output.write("\n")
@@ -785,20 +812,21 @@ class ExManager:
         output.write("=== Bitget PnL ===\n\n")
         try:
             avg_price_bg = self.calculate_bg_avg_buy_price(coin)
-            if avg_price_bg is not None and current_price_bitget is not None:
-                pnl = current_price_bitget - avg_price_bg
+            if avg_price_bg is not None and bid1_bitget is not None:
+                pnl = bid1_bitget - avg_price_bg
                 pnl_percent = (pnl / avg_price_bg) * 100.0
-                output.write(f"[BG] current_price: ${current_price_bitget:.3f}, avg_price: ${avg_price_bg:.3f}, pnl: {pnl_percent:.3f}%\n")
+                output.write(f"[BG] bid1 price: ${bid1_bitget:.3f}, avg_price: ${avg_price_bg:.3f}, pnl: {pnl_percent:.3f}%\n")
             else:
                 if avg_price_bg is None:
                     output.write("[BG] no buy history\n")
                 else:
-                    output.write("[BG] current price unavailable\n")
+                    output.write("[BG] bid1 price unavailable\n")
         except Exception as e:
             output.write(f"[BG] Error calculating PnL: {e}\n")
         output.write("\n")
 
         return output.getvalue()
+
 
     ##############################################
     # 체결내역 출력 함수
