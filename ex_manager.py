@@ -903,6 +903,7 @@ class ExManager:
             output.write(f"Failed to fetch Bitget bid1 price for {coin}: {e}\n\n")
 
         output.write("=== Binance PnL ===\n\n")
+
         binance_accounts = [
             (self.binance_client_cr, "CR"),
             (self.binance_client_lilac, "LILAC"),
@@ -920,6 +921,20 @@ class ExManager:
                         output.write(f"[BN-{acc_name}] no buy history\n")
                     else:
                         output.write(f"[BN-{acc_name}] bid1 price unavailable\n")
+
+                # ▼▼▼▼▼ [추가] Binance 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
+                try:
+                    balance_info = client.get_asset_balance(asset=coin.upper())
+                    balance_amount = float(balance_info['free']) if balance_info and balance_info.get('free') else 0.0
+                    if balance_amount > 0 and bid1_binance is not None:
+                        current_value = balance_amount * bid1_binance
+                        output.write(f"[BN-{acc_name}] holding: {balance_amount:.6f} {coin.upper()}, ~ ${current_value:.2f}\n")
+                    else:
+                        output.write(f"[BN-{acc_name}] holding: 0 {coin.upper()}\n")
+                except Exception as e2:
+                    output.write(f"[BN-{acc_name}] holding check error: {e2}\n")
+                # ▲▲▲▲▲ [추가] Binance 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
+
             except Exception as e:
                 output.write(f"[BN-{acc_name}] Error calculating PnL: {e}\n")
         output.write("\n")
@@ -936,6 +951,28 @@ class ExManager:
                     output.write("[BB] no buy history\n")
                 else:
                     output.write("[BB] bid1 price unavailable\n")
+
+            # ▼▼▼▼▼ [추가] Bybit 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
+            try:
+                response = self.bybit_client.get_wallet_balance(accountType="UNIFIED")
+                if response['retCode'] == 0:
+                    coin_balance = 0.0
+                    for account_item in response['result']['list']:
+                        for c in account_item['coin']:
+                            if c['coin'].upper() == coin.upper():
+                                coin_balance = float(c.get('walletBalance', 0.0))
+                                break
+                    if coin_balance > 0 and bid1_bybit is not None:
+                        current_value = coin_balance * bid1_bybit
+                        output.write(f"[BB] holding: {coin_balance:.6f} {coin.upper()}, ~ ${current_value:.2f}\n")
+                    else:
+                        output.write(f"[BB] holding: 0 {coin.upper()}\n")
+                else:
+                    output.write(f"[BB] holding check error: {response['retMsg']}\n")
+            except Exception as e2:
+                output.write(f"[BB] holding check error: {e2}\n")
+            # ▲▲▲▲▲ [추가] Bybit 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
+
         except Exception as e:
             output.write(f"[BB] Error calculating PnL: {e}\n")
         output.write("\n")
@@ -952,6 +989,25 @@ class ExManager:
                     output.write("[BG] no buy history\n")
                 else:
                     output.write("[BG] bid1 price unavailable\n")
+
+            # ▼▼▼▼▼ [추가] Bitget 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
+            try:
+                res = self.check_spot_balance(coin=coin.upper())
+                coin_balance = 0.0
+                if res and res.get("code") == "00000":
+                    for b in res.get("data", []):
+                        if b.get("coin", "").upper() == coin.upper():
+                            coin_balance = float(b.get("available", 0.0))
+                            break
+                if coin_balance > 0 and bid1_bitget is not None:
+                    current_value = coin_balance * bid1_bitget
+                    output.write(f"[BG] holding: {coin_balance:.6f} {coin.upper()}, ~ ${current_value:.2f}\n")
+                else:
+                    output.write(f"[BG] holding: 0 {coin.upper()}\n")
+            except Exception as e2:
+                output.write(f"[BG] holding check error: {e2}\n")
+            # ▲▲▲▲▲ [추가] Bitget 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
+
         except Exception as e:
             output.write(f"[BG] Error calculating PnL: {e}\n")
         output.write("\n")
@@ -1175,7 +1231,7 @@ class ExManager:
             text_lower = original_text.lower()
 
             # 디버깅용 - 콘솔에서 확인하고 싶다면 남겨둠
-            # print(f"Received command: {original_text}\n")
+            print(f"Received command: {original_text}\n")
 
             # notice_test, test
             if text_lower in ["notice_test", "test"]:
