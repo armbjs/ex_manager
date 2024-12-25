@@ -915,12 +915,12 @@ class ExManager:
                 if avg_price is not None and bid1_binance is not None:
                     pnl = bid1_binance - avg_price
                     pnl_percent = (pnl / avg_price) * 100.0
-                    output.write(f"[BN-{acc_name}] bid1 price: ${bid1_binance:.6f}, avg_price: ${avg_price:.6f}, pnl: {pnl_percent:.3f}%\n")
+                    output.write(f"[BNS-{acc_name}] bid1_price: ${bid1_binance:.6f}, avg_price: ${avg_price:.6f}, pnl: {pnl_percent:.3f}%\n")
                 else:
                     if avg_price is None:
-                        output.write(f"[BN-{acc_name}] no buy history\n")
+                        output.write(f"[BNS-{acc_name}] no buy history\n")
                     else:
-                        output.write(f"[BN-{acc_name}] bid1 price unavailable\n")
+                        output.write(f"[BNS-{acc_name}] bid1 price unavailable\n")
 
                 # ▼▼▼▼▼ [추가] Binance 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
                 try:
@@ -928,15 +928,15 @@ class ExManager:
                     balance_amount = float(balance_info['free']) if balance_info and balance_info.get('free') else 0.0
                     if balance_amount > 0 and bid1_binance is not None:
                         current_value = balance_amount * bid1_binance
-                        output.write(f"[BN-{acc_name}] holding: {balance_amount:.6f} {coin.upper()}, ~ ${current_value:.2f}\n")
+                        output.write(f"[BNS-{acc_name}] holding: {balance_amount:.6f} {coin.upper()} == ${current_value:.2f}\n\n")
                     else:
-                        output.write(f"[BN-{acc_name}] holding: 0 {coin.upper()}\n")
+                        output.write(f"[BNS-{acc_name}] holding: 0 {coin.upper()}\n\n")
                 except Exception as e2:
-                    output.write(f"[BN-{acc_name}] holding check error: {e2}\n")
+                    output.write(f"[BNS-{acc_name}] holding check error: {e2}\n\n")
                 # ▲▲▲▲▲ [추가] Binance 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
 
             except Exception as e:
-                output.write(f"[BN-{acc_name}] Error calculating PnL: {e}\n")
+                output.write(f"[BNS-{acc_name}] Error calculating PnL: {e}\n\n")
         output.write("\n")
 
         output.write("=== Bybit PnL ===\n\n")
@@ -945,12 +945,12 @@ class ExManager:
             if avg_price_bybit is not None and bid1_bybit is not None:
                 pnl = bid1_bybit - avg_price_bybit
                 pnl_percent = (pnl / avg_price_bybit) * 100.0
-                output.write(f"[BB] bid1 price: ${bid1_bybit:.6f}, avg_price: ${avg_price_bybit:.6f}, pnl: {pnl_percent:.3f}%\n")
+                output.write(f"[BBS] bid1_price: ${bid1_bybit:.6f}, avg_price: ${avg_price_bybit:.6f}, pnl: {pnl_percent:.3f}%\n")
             else:
                 if avg_price_bybit is None:
-                    output.write("[BB] no buy history\n")
+                    output.write("[BBS] no buy history\n")
                 else:
-                    output.write("[BB] bid1 price unavailable\n")
+                    output.write("[BBS] bid1 price unavailable\n")
 
             # ▼▼▼▼▼ [추가] Bybit 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
             try:
@@ -964,17 +964,17 @@ class ExManager:
                                 break
                     if coin_balance > 0 and bid1_bybit is not None:
                         current_value = coin_balance * bid1_bybit
-                        output.write(f"[BB] holding: {coin_balance:.6f} {coin.upper()}, ~ ${current_value:.2f}\n")
+                        output.write(f"[BBS] holding: {coin_balance:.6f} {coin.upper()} == ${current_value:.2f}\n\n")
                     else:
-                        output.write(f"[BB] holding: 0 {coin.upper()}\n")
+                        output.write(f"[BBS] holding: 0 {coin.upper()}\n\n")
                 else:
-                    output.write(f"[BB] holding check error: {response['retMsg']}\n")
+                    output.write(f"[BBS] holding check error: {response['retMsg']}\n\n")
             except Exception as e2:
-                output.write(f"[BB] holding check error: {e2}\n")
+                output.write(f"[BBS] holding check error: {e2}\n\n")
             # ▲▲▲▲▲ [추가] Bybit 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
 
         except Exception as e:
-            output.write(f"[BB] Error calculating PnL: {e}\n")
+            output.write(f"[BBS] Error calculating PnL: {e}\n")
         output.write("\n")
 
         output.write("=== Bitget PnL ===\n\n")
@@ -983,12 +983,12 @@ class ExManager:
             if avg_price_bg is not None and bid1_bitget is not None:
                 pnl = bid1_bitget - avg_price_bg
                 pnl_percent = (pnl / avg_price_bg) * 100.0
-                output.write(f"[BG] bid1 price: ${bid1_bitget:.6f}, avg_price: ${avg_price_bg:.6f}, pnl: {pnl_percent:.3f}%\n")
+                output.write(f"[BGS] bid1_price: ${bid1_bitget:.6f}, avg_price: ${avg_price_bg:.6f}, pnl: {pnl_percent:.3f}%\n")
             else:
                 if avg_price_bg is None:
-                    output.write("[BG] no buy history\n")
+                    output.write("[BGS] no buy history\n")
                 else:
-                    output.write("[BG] bid1 price unavailable\n")
+                    output.write("[BGS] bid1_price unavailable\n")
 
             # ▼▼▼▼▼ [추가] Bitget 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
             try:
@@ -1001,15 +1001,15 @@ class ExManager:
                             break
                 if coin_balance > 0 and bid1_bitget is not None:
                     current_value = coin_balance * bid1_bitget
-                    output.write(f"[BG] holding: {coin_balance:.6f} {coin.upper()}, ~ ${current_value:.2f}\n")
+                    output.write(f"[BGS] holding: {coin_balance:.6f} {coin.upper()} == ${current_value:.2f}\n\n")
                 else:
-                    output.write(f"[BG] holding: 0 {coin.upper()}\n")
+                    output.write(f"[BGS] holding: 0 {coin.upper()}\n\n")
             except Exception as e2:
-                output.write(f"[BG] holding check error: {e2}\n")
+                output.write(f"[BGS] holding check error: {e2}\n\n")
             # ▲▲▲▲▲ [추가] Bitget 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
 
         except Exception as e:
-            output.write(f"[BG] Error calculating PnL: {e}\n")
+            output.write(f"[BGS] Error calculating PnL: {e}\n\n")
         output.write("\n")
 
         return output.getvalue()
@@ -1101,15 +1101,15 @@ class ExManager:
         bb_result = self.buy_bybit_coin_usdt_raw(coin, usdt_amount)
         bg_result = self.bitget_buy_coin_usdt_raw(coin, usdt_amount)
 
-        output.write("[BN - CR]\n")
+        output.write("[BNS - CR]\n")
         output.write(str(bn_cr_result) + "\n\n")
-        output.write("[BN - LILAC]\n")
+        output.write("[BNS - LILAC]\n")
         output.write(str(bn_lilac_result) + "\n\n")
-        output.write("[BN - EX]\n")
+        output.write("[BNS - EX]\n")
         output.write(str(bn_ex_result) + "\n\n")
-        output.write("[BB]\n")
+        output.write("[BBS]\n")
         output.write(str(bb_result) + "\n\n")
-        output.write("[BG]\n")
+        output.write("[BGS]\n")
         output.write(str(bg_result) + "\n\n")
         return output.getvalue()
 
@@ -1124,15 +1124,15 @@ class ExManager:
         bb_result = self.sell_all_bybit_coin_raw(coin)
         bg_result = self.bitget_sell_all_coin_raw(coin)
 
-        output.write("[BN - CR]\n")
+        output.write("[BNS - CR]\n")
         output.write(str(bn_cr_result) + "\n\n")
-        output.write("[BN - LILAC]\n")
+        output.write("[BNS - LILAC]\n")
         output.write(str(bn_lilac_result) + "\n\n")
-        output.write("[BN - EX]\n")
+        output.write("[BNS - EX]\n")
         output.write(str(bn_ex_result) + "\n\n")
-        output.write("[BB]\n")
+        output.write("[BBS]\n")
         output.write(str(bb_result) + "\n\n")
-        output.write("[BG]\n")
+        output.write("[BGS]\n")
         output.write(str(bg_result) + "\n\n")
         return output.getvalue()
     ##############################################
@@ -1157,15 +1157,15 @@ class ExManager:
         # Bitget
         bg_result = self.bitget_sell_partial_coin_raw(coin, percent)
 
-        output.write("[BN - CR]\n")
+        output.write("[BNS - CR]\n")
         output.write(str(bn_cr_result) + "\n\n")
-        output.write("[BN - LILAC]\n")
+        output.write("[BNS - LILAC]\n")
         output.write(str(bn_lilac_result) + "\n\n")
-        output.write("[BN - EX]\n")
+        output.write("[BNS - EX]\n")
         output.write(str(bn_ex_result) + "\n\n")
-        output.write("[BB]\n")
+        output.write("[BBS]\n")
         output.write(str(bb_result) + "\n\n")
-        output.write("[BG]\n")
+        output.write("[BGS]\n")
         output.write(str(bg_result) + "\n\n")
         return output.getvalue()
 
@@ -1313,6 +1313,7 @@ class ExManager:
                 for cmd, desc in self.COMMANDS_HELP:
                     buffer.write(f"{cmd} : {desc}\n")
                 buffer.write("\n")
+                buffer.write("\nlisting-handler-walsook v0.1.0\n\n")
 
             else:
                 # 기존: print("No such feature.\n")
