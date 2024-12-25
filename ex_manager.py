@@ -328,6 +328,9 @@ class ExManager:
         except Exception as e:
             return {"error": str(e)}
 
+    ###############################################################
+    ################# 전량 매도 부분 절대 수정 금지 #################
+
     def sell_all_binance_coin_raw(self, client, coin):
         try:
             coin = coin.upper()
@@ -342,6 +345,41 @@ class ExManager:
             quantity = float(int(balance_amount))
             if quantity <= 0:
                 return {"error": "Quantity too small"}
+
+            symbol = coin + "USDT"
+            order = client.create_order(
+                symbol=symbol,
+                side=SIDE_SELL,
+                type=ORDER_TYPE_MARKET,
+                quantity=quantity
+            )
+            return order
+        except Exception as e:
+            return {"error": str(e)}
+
+    ################# 전량 매도 부분 절대 수정 금지 #################
+    ###############################################################
+
+    # 새로 추가 - 부분매도
+    def sell_partial_binance_coin_raw(self, client, coin, percent):
+        """
+        coin 보유량의 percent%만 매도(소숫점은 버림)
+        예: percent=50, balance=123 → 61개 매도
+        """
+        try:
+            coin = coin.upper()
+            balance_info = client.get_asset_balance(asset=coin)
+            if not balance_info:
+                return {"error": "Balance query failed"}
+            balance_amount = float(balance_info['free'])
+
+            if balance_amount <= 0:
+                return {"error": "No balance to sell"}
+
+            partial_amount = balance_amount * (percent / 100.0)
+            quantity = float(int(partial_amount))  # 소숫점 버림
+            if quantity <= 0:
+                return {"error": f"Quantity too small after applying {percent}%."}
 
             symbol = coin + "USDT"
             order = client.create_order(
@@ -460,6 +498,7 @@ class ExManager:
         except Exception as e:
             return {"error": str(e)}
 
+    # 절대 수정 금지: 전량매도
     def sell_all_bybit_coin_raw(self, coin):
         try:
             coin = coin.upper()
@@ -486,6 +525,54 @@ class ExManager:
 
             decimal_places = self.get_decimal_places(qty_step)
             qty_str = f"{sell_qty:.{decimal_places}f}"
+
+            order_resp = self.bybit_client.place_order(
+                category="spot",
+                symbol=symbol,
+                side="Sell",
+                orderType="MARKET",
+                qty=qty_str
+            )
+            return order_resp
+        except Exception as e:
+            return {"error": str(e)}
+    ###########################################################
+
+    # 새로 추가: 부분매도 (퍼센트) for Bybit
+    def sell_partial_bybit_coin_raw(self, coin, percent):
+        try:
+            coin = coin.upper()
+            symbol = coin + "USDT"
+            min_qty, qty_step = self.get_symbol_filters(symbol)
+
+            response = self.bybit_client.get_wallet_balance(accountType="UNIFIED")
+            if response['retCode'] != 0:
+                return {"error": response['retMsg']}
+
+            coin_balance = 0.0
+            for account_item in response['result']['list']:
+                for c in account_item['coin']:
+                    if c['coin'].upper() == coin:
+                        coin_balance = float(c['walletBalance'])
+                        break
+
+            if coin_balance <= 0:
+                return {"error": "No balance to sell"}
+
+            partial_amount = coin_balance * (percent / 100.0)
+            # step 보정
+            partial_amount_adj = self.adjust_quantity_to_step(partial_amount, qty_step, 0)
+            final_qty = float(int(partial_amount_adj))  # 소숫점 버림
+
+            if final_qty <= 0:
+                return {"error": f"Quantity too small after applying {percent}%."}
+
+            # min_qty 다시 체크
+            if final_qty < min_qty:
+                return {"error": "Quantity too small after step adjustment"}
+
+            decimal_places = self.get_decimal_places(qty_step)
+            qty_str = f"{final_qty:.{decimal_places}f}"
 
             order_resp = self.bybit_client.place_order(
                 category="spot",
@@ -631,6 +718,7 @@ class ExManager:
         order_resp = self.place_spot_order(symbol=symbol, side="buy", order_type="market", force="normal", size=str(usdt_to_use))
         return order_resp
 
+    # 절대 수정 금지: 전량매도
     def bitget_sell_all_coin_raw(self, coin):
         coin = coin.upper()
         balance_data = self.check_spot_balance()
@@ -657,6 +745,49 @@ class ExManager:
             return {"error": "Amount too small"}
 
         max_size = round(amount, quantity_precision)
+        step = 10 ** (-quantity_precision)
+        safe_size = max_size - step
+        if safe_size < min_trade_amount:
+            safe_size = min_trade_amount
+
+        size_str = f"{safe_size:.{quantity_precision}f}"
+        order_resp = self.place_spot_order(symbol=symbol, side="sell", order_type="market", force="normal", size=size_str)
+        return order_resp
+    ###################################################################
+
+    # 새로 추가: 부분매도 (퍼센트) for Bitget
+    def bitget_sell_partial_coin_raw(self, coin, percent):
+        coin = coin.upper()
+        balance_data = self.check_spot_balance()
+        if balance_data.get("code") != "00000":
+            return {"error": balance_data.get('msg', 'Balance query error')}
+        available_amount = "0"
+        for b in balance_data.get("data", []):
+            if b.get("coin").upper() == coin:
+                available_amount = b.get("available", "0")
+                break
+
+        amount = float(available_amount)
+        if amount <= 0:
+            return {"error": "No balance to sell"}
+
+        partial_amount = amount * (percent / 100.0)
+        partial_amount_floor = float(int(partial_amount))  # 소숫점 버림
+        if partial_amount_floor <= 0:
+            return {"error": f"Quantity too small after applying {percent}%"}
+
+        symbol = coin + "USDT"
+        symbol_info = self.get_bitget_symbol_info(symbol)
+        if not symbol_info:
+            return {"error": "Symbol info not found"}
+
+        min_trade_amount = float(symbol_info.get("minTradeAmount", "1"))
+        quantity_precision = int(symbol_info.get("quantityPrecision", "2"))
+
+        if partial_amount_floor < min_trade_amount:
+            return {"error": "Amount too small"}
+
+        max_size = round(partial_amount_floor, quantity_precision)
         step = 10 ** (-quantity_precision)
         safe_size = max_size - step
         if safe_size < min_trade_amount:
@@ -783,7 +914,7 @@ class ExManager:
                 if avg_price is not None and bid1_binance is not None:
                     pnl = bid1_binance - avg_price
                     pnl_percent = (pnl / avg_price) * 100.0
-                    output.write(f"[BN-{acc_name}] bid1 price: ${bid1_binance:.3f}, avg_price: ${avg_price:.3f}, pnl: {pnl_percent:.3f}%\n")
+                    output.write(f"[BN-{acc_name}] bid1 price: ${bid1_binance:.6f}, avg_price: ${avg_price:.6f}, pnl: {pnl_percent:.3f}%\n")
                 else:
                     if avg_price is None:
                         output.write(f"[BN-{acc_name}] no buy history\n")
@@ -799,7 +930,7 @@ class ExManager:
             if avg_price_bybit is not None and bid1_bybit is not None:
                 pnl = bid1_bybit - avg_price_bybit
                 pnl_percent = (pnl / avg_price_bybit) * 100.0
-                output.write(f"[BB] bid1 price: ${bid1_bybit:.3f}, avg_price: ${avg_price_bybit:.3f}, pnl: {pnl_percent:.3f}%\n")
+                output.write(f"[BB] bid1 price: ${bid1_bybit:.6f}, avg_price: ${avg_price_bybit:.6f}, pnl: {pnl_percent:.3f}%\n")
             else:
                 if avg_price_bybit is None:
                     output.write("[BB] no buy history\n")
@@ -815,7 +946,7 @@ class ExManager:
             if avg_price_bg is not None and bid1_bitget is not None:
                 pnl = bid1_bitget - avg_price_bg
                 pnl_percent = (pnl / avg_price_bg) * 100.0
-                output.write(f"[BG] bid1 price: ${bid1_bitget:.3f}, avg_price: ${avg_price_bg:.3f}, pnl: {pnl_percent:.3f}%\n")
+                output.write(f"[BG] bid1 price: ${bid1_bitget:.6f}, avg_price: ${avg_price_bg:.6f}, pnl: {pnl_percent:.3f}%\n")
             else:
                 if avg_price_bg is None:
                     output.write("[BG] no buy history\n")
@@ -926,6 +1057,7 @@ class ExManager:
         output.write(str(bg_result) + "\n\n")
         return output.getvalue()
 
+    # 절대 수정 금지(기존 전량매도)
     def sell_all(self, coin):
         output = StringIO()
         output.write("=== sell all ===\n\n")
@@ -935,6 +1067,39 @@ class ExManager:
 
         bb_result = self.sell_all_bybit_coin_raw(coin)
         bg_result = self.bitget_sell_all_coin_raw(coin)
+
+        output.write("[BN - CR]\n")
+        output.write(str(bn_cr_result) + "\n\n")
+        output.write("[BN - LILAC]\n")
+        output.write(str(bn_lilac_result) + "\n\n")
+        output.write("[BN - EX]\n")
+        output.write(str(bn_ex_result) + "\n\n")
+        output.write("[BB]\n")
+        output.write(str(bb_result) + "\n\n")
+        output.write("[BG]\n")
+        output.write(str(bg_result) + "\n\n")
+        return output.getvalue()
+    ##############################################
+    
+    # 새로 추가: 부분매도 (퍼센트) - 모든 거래소
+    def sell_partial_all(self, coin, percent):
+        """
+        coin 보유량의 percent%만 매도.
+        전량매도 함수(sell_all)는 절대 수정 불가이므로, 별도의 함수를 만듬.
+        """
+        output = StringIO()
+        output.write(f"=== sell partial ({percent}%) ===\n\n")
+
+        # Binance 3 계정
+        bn_cr_result = self.sell_partial_binance_coin_raw(self.binance_client_cr, coin, percent)
+        bn_lilac_result = self.sell_partial_binance_coin_raw(self.binance_client_lilac, coin, percent)
+        bn_ex_result = self.sell_partial_binance_coin_raw(self.binance_client_ex, coin, percent)
+
+        # Bybit
+        bb_result = self.sell_partial_bybit_coin_raw(coin, percent)
+
+        # Bitget
+        bg_result = self.bitget_sell_partial_coin_raw(coin, percent)
 
         output.write("[BN - CR]\n")
         output.write(str(bn_cr_result) + "\n\n")
@@ -982,75 +1147,124 @@ class ExManager:
     # 명령어 헬프
     ##############################################
     COMMANDS_HELP = [
-        ("notice_test", "테스트 공지 발행"),
+        ("test, notice_test", "테스트 공지 발행"),
         ("buy.COIN.value", "COIN을 USDT로 value만큼 매수 (예: buy.BTC.100)"),
         ("sell.COIN", "COIN 전량 매도 (예: sell.ETH)"),
-        ("show_trx.COIN", "COIN 거래내역 조회 (예: show_trx.BTC)"),
-        ("show_pnl.COIN", "COIN 손익 평가 (예: show_pnl.BTC)"),
-        ("show_bal", "모든 계좌 잔고 조회"),
-        ("명령어", "사용 가능한 명령어 목록 표시")
+        ("sell.COIN.percent", "COIN 부분 매도 (예: sell.XRP.50 -> 보유량의 50% 매도)"),
+        ("show_trx.COIN, trx.COIN", "COIN 거래내역 조회 (예: show_trx.BTC 혹은 trx.BTC)"),
+        ("show_pnl.COIN, pnl.COIN", "COIN 손익 평가 (예: show_pnl.BTC 혹은 pnl.BTC)"),
+        ("show_bal, bal", "모든 계좌 잔고 조회"),
+        ("명령어, help, ?, h", "사용 가능한 명령어 목록 표시")
     ]
 
     def execute_command(self, text):
-        # 명령어 실행 후 결과를 문자열로 반환
+        """
+        기존 코드에서 print(...)만 하던 부분을
+        buffer.write(...)로 바꾸어 텔레그램에도 전송되도록 수정
+        """
+        import sys
+        from io import StringIO
+
+        # 1) 표준출력을 StringIO로 교체
         old_stdout = sys.stdout
         buffer = StringIO()
         sys.stdout = buffer
+
         try:
-            text = text.strip()
-            print(f"Received command: {text}\n")
+            original_text = text.strip()
+            text_lower = original_text.lower()
 
-            if text == "notice_test":
-                print(self.publish_test_notices())
+            # 디버깅용 - 콘솔에서 확인하고 싶다면 남겨둠
+            # print(f"Received command: {original_text}\n")
 
-            elif text.startswith("buy."):
-                parts = text.split(".")
+            # notice_test, test
+            if text_lower in ["notice_test", "test"]:
+                # 기존: print(self.publish_test_notices())
+                # 수정: buffer에 기록
+                result_str = self.publish_test_notices()
+                buffer.write(result_str)
+
+            # buy.COIN.value
+            elif text_lower.startswith("buy."):
+                parts = text_lower.split(".")
                 if len(parts) == 3:
                     coin = parts[1]
                     try:
                         value = float(parts[2])
-                        print(self.buy_all(coin, value))
+                        # 기존: print(self.buy_all(coin, value))
+                        result_str = self.buy_all(coin, value)
+                        buffer.write(result_str)
                     except:
-                        print("invalid value\n")
+                        buffer.write("invalid value\n")
                 else:
-                    print("format: buy.COIN.value\n")
+                    buffer.write("format: buy.COIN.value\n")
 
-            elif text.startswith("sell."):
-                parts = text.split(".")
-                if len(parts) == 2:
-                    coin = parts[1]
-                    print(self.sell_all(coin))
-                else:
-                    print("format: sell.COIN\n")
+            # sell.COIN.PERCENT (부분매도)
+            elif text_lower.startswith("sell.") and len(text_lower.split(".")) == 3:
+                parts = text_lower.split(".")
+                coin = parts[1]
+                try:
+                    percent = float(parts[2])
+                    # 기존: print(self.sell_partial_all(coin, percent))
+                    result_str = self.sell_partial_all(coin, percent)
+                    buffer.write(result_str)
+                except:
+                    buffer.write("invalid percent\n")
 
-            elif text.startswith("show_trx."):
-                parts = text.split(".")
+            # sell.COIN (전량매도)
+            elif text_lower.startswith("sell.") and len(text_lower.split(".")) == 2:
+                parts = text_lower.split(".")
+                coin = parts[1]
+                # 기존: print(self.sell_all(coin))
+                result_str = self.sell_all(coin)
+                buffer.write(result_str)
+
+            # show_trx.COIN, trx.COIN
+            elif text_lower.startswith("show_trx.") or text_lower.startswith("trx."):
+                parts = text_lower.split(".")
                 if len(parts) == 2:
                     c = parts[1]
-                    print(self.show_trx(c))
+                    # 기존: print(self.show_trx(c))
+                    result_str = self.show_trx(c)
+                    buffer.write(result_str)
                 else:
-                    print("format: show_trx.COIN\n")
+                    buffer.write("format: show_trx.COIN or trx.COIN\n")
 
-            elif text.startswith("show_pnl."):
-                parts = text.split(".")
+            # show_pnl.COIN, pnl.COIN
+            elif text_lower.startswith("show_pnl.") or text_lower.startswith("pnl."):
+                parts = text_lower.split(".")
                 if len(parts) == 2:
                     c = parts[1]
-                    print(self.show_profit_loss_per_account(c))
+                    # 기존: print(self.show_profit_loss_per_account(c))
+                    result_str = self.show_profit_loss_per_account(c)
+                    buffer.write(result_str)
                 else:
-                    print("format: show_pnl.COIN\n")
+                    buffer.write("format: show_pnl.COIN or pnl.COIN\n")
 
-            elif text == "show_bal":
-                print(self.check_all_balances())
+            # show_bal, bal
+            elif text_lower in ["show_bal", "bal"]:
+                # 기존: print(self.check_all_balances())
+                result_str = self.check_all_balances()
+                buffer.write(result_str)
 
-            elif text in ["명령어", "help"]:
-                print("=== 사용 가능한 명령어 목록 ===\n")
+            # 명령어, help, ?, h
+            elif text_lower in ["명령어", "help", "?", "h"]:
+                # 기존: print("=== 사용 가능한 명령어 목록 ===\n")
+                #       for cmd, desc in self.COMMANDS_HELP:
+                #           print(f"{cmd} : {desc}")
+                #       print()
+                buffer.write("=== 사용 가능한 명령어 목록 ===\n\n")
                 for cmd, desc in self.COMMANDS_HELP:
-                    print(f"{cmd} : {desc}")
-                print()
+                    buffer.write(f"{cmd} : {desc}\n")
+                buffer.write("\n")
 
             else:
-                print("No such feature.\n")
+                # 기존: print("No such feature.\n")
+                buffer.write("No such feature.\n")
 
         finally:
+            # 2) stdout 복구
             sys.stdout = old_stdout
+
+        # 3) 최종 반환: buffer에 쌓인 문자열 → 텔레그램 메시지로 전송 가능
         return buffer.getvalue()
