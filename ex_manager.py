@@ -19,6 +19,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from binance.client import Client
 from binance.enums import *
 from pybit.unified_trading import HTTP
+from process_template.utils import get_now_dt_str_in_simple_form 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -158,95 +159,95 @@ class ExManager:
         coin_symbol = f"TST{current_time % 1000:03d}"
 
         # UPBIT 형식의 영문 공지사항
-        upbit_notice_en1 = {
-            "type": "NOTICE",
-            "action": "NEW",
-            "title": f"Market Support for {coin_symbol}(TASDSDW), XRP(RIPPLE) (BTC, USDT Market)",
-            "content": None,
-            "exchange": "UPBIT",
-            "url": "https://upbit.com/service_center/notice?id=4695",
-            "category": "Trade",
-            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-            "listedTs": current_time,
-            "receivedTs": current_time + 100
-        }
-        upbit_notice_en1_json = json.dumps(upbit_notice_en1, ensure_ascii=False)
-        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_en1_json)
-        time.sleep(1)
+        # upbit_notice_en1 = {
+        #     "type": "NOTICE",
+        #     "action": "NEW",
+        #     "title": f"Market Support for {coin_symbol}(TASDSDW), XRP(RIPPLE) (BTC, USDT Market)",
+        #     "content": None,
+        #     "exchange": "UPBIT",
+        #     "url": "https://upbit.com/service_center/notice?id=4695",
+        #     "category": "Trade",
+        #     "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+        #     "listedTs": current_time,
+        #     "receivedTs": current_time + 100
+        # }
+        # upbit_notice_en1_json = json.dumps(upbit_notice_en1, ensure_ascii=False)
+        # self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_en1_json)
+        # time.sleep(1)
 
-        # UPBIT 형식의 영문 공지사항 (코인 순서 변경)
-        upbit_notice_en2 = {
-            "type": "NOTICE",
-            "action": "NEW",
-            "title": f"Market Support for TASDSDW({coin_symbol}), RIPPLE(XRP) (BTC, USDT Market)",
-            "content": None,
-            "exchange": "UPBIT",
-            "url": "https://upbit.com/service_center/notice?id=4695",
-            "category": "Trade",
-            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-            "listedTs": current_time,
-            "receivedTs": current_time + 100
-        }
-        upbit_notice_en2_json = json.dumps(upbit_notice_en2, ensure_ascii=False)
-        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_en2_json)
-        time.sleep(1)
+        # # UPBIT 형식의 영문 공지사항 (코인 순서 변경)
+        # upbit_notice_en2 = {
+        #     "type": "NOTICE",
+        #     "action": "NEW",
+        #     "title": f"Market Support for TASDSDW({coin_symbol}), RIPPLE(XRP) (BTC, USDT Market)",
+        #     "content": None,
+        #     "exchange": "UPBIT",
+        #     "url": "https://upbit.com/service_center/notice?id=4695",
+        #     "category": "Trade",
+        #     "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+        #     "listedTs": current_time,
+        #     "receivedTs": current_time + 100
+        # }
+        # upbit_notice_en2_json = json.dumps(upbit_notice_en2, ensure_ascii=False)
+        # self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_en2_json)
+        # time.sleep(1)
 
-        # UPBIT 형식의 한글 공지사항 1
-        upbit_notice_kr1 = {
-            "type": "NOTICE",
-            "action": "NEW",
-            "title": f"{coin_symbol}(테스트코인), XRP(RIPPLE) 신규 거래지원 안내 (BTC, USDT 마켓)",
-            "content": None,
-            "exchange": "UPBIT",
-            "url": "https://upbit.com/service_center/notice?id=4695",
-            "category": "Trade",
-            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-            "listedTs": current_time,
-            "receivedTs": current_time + 100
-        }
-        upbit_notice_kr1_json = json.dumps(upbit_notice_kr1, ensure_ascii=False)
-        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr1_json)
-        time.sleep(1)
+        # # UPBIT 형식의 한글 공지사항 1
+        # upbit_notice_kr1 = {
+        #     "type": "NOTICE",
+        #     "action": "NEW",
+        #     "title": f"{coin_symbol}(테스트코인), XRP(RIPPLE) 신규 거래지원 안내 (BTC, USDT 마켓)",
+        #     "content": None,
+        #     "exchange": "UPBIT",
+        #     "url": "https://upbit.com/service_center/notice?id=4695",
+        #     "category": "Trade",
+        #     "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+        #     "listedTs": current_time,
+        #     "receivedTs": current_time + 100
+        # }
+        # upbit_notice_kr1_json = json.dumps(upbit_notice_kr1, ensure_ascii=False)
+        # self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr1_json)
+        # time.sleep(1)
 
-        # UPBIT 형식의 한글 공지사항 2
-        upbit_notice_kr2 = {
-            "type": "NOTICE",
-            "action": "NEW",
-            "title": f"테스트코인({coin_symbol}), 리플(XRP) 신규 거래지원 안내 (BTC, USDT 마켓)",
-            "content": None,
-            "exchange": "UPBIT",
-            "url": "https://upbit.com/service_center/notice?id=4695",
-            "category": "Trade",
-            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-            "listedTs": current_time,
-            "receivedTs": current_time + 100
-        }
-        upbit_notice_kr2_json = json.dumps(upbit_notice_kr2, ensure_ascii=False)
-        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr2_json)
-        time.sleep(1)
+        # # UPBIT 형식의 한글 공지사항 2
+        # upbit_notice_kr2 = {
+        #     "type": "NOTICE",
+        #     "action": "NEW",
+        #     "title": f"테스트코인({coin_symbol}), 리플(XRP) 신규 거래지원 안내 (BTC, USDT 마켓)",
+        #     "content": None,
+        #     "exchange": "UPBIT",
+        #     "url": "https://upbit.com/service_center/notice?id=4695",
+        #     "category": "Trade",
+        #     "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+        #     "listedTs": current_time,
+        #     "receivedTs": current_time + 100
+        # }
+        # upbit_notice_kr2_json = json.dumps(upbit_notice_kr2, ensure_ascii=False)
+        # self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr2_json)
+        # time.sleep(1)
 
-        # UPBIT 형식의 한글 공지사항 3
-        upbit_notice_kr3 = {
-            "type": "NOTICE",
-            "action": "NEW",
-            "title": f"테스트코인({coin_symbol}), 리플(XRP) KRW, USDT 마켓 디지털 자산 추가",
-            "content": None,
-            "exchange": "UPBIT",
-            "url": "https://upbit.com/service_center/notice?id=4695",
-            "category": "Trade",
-            "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-            "listedTs": current_time,
-            "receivedTs": current_time + 100
-        }
-        upbit_notice_kr3_json = json.dumps(upbit_notice_kr3, ensure_ascii=False)
-        self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr3_json)
-        time.sleep(1)
+        # # UPBIT 형식의 한글 공지사항 3
+        # upbit_notice_kr3 = {
+        #     "type": "NOTICE",
+        #     "action": "NEW",
+        #     "title": f"테스트코인({coin_symbol}), 리플(XRP) KRW, USDT 마켓 디지털 자산 추가",
+        #     "content": None,
+        #     "exchange": "UPBIT",
+        #     "url": "https://upbit.com/service_center/notice?id=4695",
+        #     "category": "Trade",
+        #     "listedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+        #     "listedTs": current_time,
+        #     "receivedTs": current_time + 100
+        # }
+        # upbit_notice_kr3_json = json.dumps(upbit_notice_kr3, ensure_ascii=False)
+        # self.redis_client.publish(REDIS_PUBLISH_CHANNEL_NAME_PREFIX, upbit_notice_kr3_json)
+        # time.sleep(1)
 
         # BITHUMB 형식의 공지사항
         bithumb_notice = {
             "type": "NOTICE",
             "action": "NEW",
-            "title": f"[거래] {coin_symbol}(TestCoin), XRP(리플) 신규 거래지원 안내 (BTC, USDT 마켓)",
+            "title": f"[마켓 추가] 테스트코인({coin_symbol}), 리플(XRP) 원화 마켓 추가",
             "content": None,
             "exchange": "BITHUMB",
             "url": "https://feed.bithumb.com/notice/1645287",
@@ -1042,49 +1043,132 @@ class ExManager:
     # 전체 잔고 조회 함수
     ##############################################
     def check_all_balances(self):
+        """
+        bal 명령어 실행 시 호출되는 함수.
+        USDT를 맨 위, 나머지는 보유 수량 내림차순 정렬. (줄바꿈을 최소화)
+        """
+        from io import StringIO
         output = StringIO()
-        output.write("\n=== All Balances ===\n\n")
-        output.write("=== Binance Spot Balances (3acc) ===\n\n")
-        output.write(self.get_spot_balance_all())
 
-        output.write("=== Bybit Unified Balances ===\n\n")
+        # 상단 타이틀
+        output.write("=== All Balances ===\n\n")
+
+        ########################################################################
+        # 1) Binance (3계정)
+        ########################################################################
+        output.write("=== Binance Spot Balances (3acc) ===\n")
+
+        binance_accounts = [
+            (self.binance_client_cr, "CR"),
+            (self.binance_client_lilac, "LILAC"),
+            (self.binance_client_ex, "EX")
+        ]
+
+        for client, acc_name in binance_accounts:
+            key_name = f"[BNS-{acc_name}]"
+
+            try:
+                account_info = client.get_account()
+                balances = [
+                    asset for asset in account_info['balances']
+                    if float(asset['free']) > 0 or float(asset['locked']) > 0
+                ]
+
+                # (coin_name, total_amt)
+                temp_list = []
+                for b in balances:
+                    coin_name = b['asset'].upper()
+                    total_amt = float(b['free']) + float(b['locked'])
+                    temp_list.append((coin_name, total_amt))
+
+                # 정렬: USDT → 맨 위, 나머지는 total_amt 내림차순
+                def sort_key(item):
+                    c_name, amt = item
+                    is_usdt = 0 if c_name == "USDT" else 1
+                    return (is_usdt, -amt)
+
+                temp_list.sort(key=sort_key)
+
+                # 타이틀 (계정명) + 목록 출력
+                output.write(f"\n{key_name}\n")
+                for coin_name, total_amt in temp_list:
+                    output.write(f"{key_name} {coin_name}: {total_amt}\n")
+
+            except Exception as e:
+                output.write(f"\n{key_name} error: {e}\n")
+
+        ########################################################################
+        # 2) Bybit Unified Balances
+        ########################################################################
+        output.write("\n=== Bybit Unified Balances ===\n")
         try:
             response = self.bybit_client.get_wallet_balance(accountType="UNIFIED")
             if response['retCode'] == 0:
-                coins_found = False
+                balances_found = False
+                temp_list = []
                 for account_item in response['result']['list']:
                     for c in account_item['coin']:
-                        wallet_balance = float(c.get('walletBalance', 0))
-                        if wallet_balance > 0:
-                            output.write(f"{c['coin']}: balance: {wallet_balance}\n")
-                            coins_found = True
-                if not coins_found:
+                        coin_name = c['coin'].upper()
+                        w_bal = float(c.get('walletBalance', 0))
+                        if w_bal > 0:
+                            balances_found = True
+                            temp_list.append((coin_name, w_bal))
+
+                if not balances_found:
                     output.write("no balance\n")
+                else:
+                    def sort_key_bbs(item):
+                        cn, amt = item
+                        return (0 if cn == "USDT" else 1, -amt)
+
+                    temp_list.sort(key=sort_key_bbs)
+
+                    output.write("\n[BBS]\n")
+                    for coin_name, w_bal in temp_list:
+                        output.write(f"[BBS] {coin_name}: {w_bal}\n")
             else:
-                output.write(f"balance query failed: {response['retMsg']}\n")
+                output.write(f"\nbalance query failed: {response['retMsg']}\n")
         except Exception as e:
-            output.write(f"error: {e}\n")
-        output.write("\n")
+            output.write(f"\n[BBS] error: {e}\n")
 
-        output.write("=== Bitget Spot Balances ===\n\n")
-        res = self.check_spot_balance()
-        if res and res.get("code") == "00000":
-            data = res.get("data", [])
-            if not data:
-                output.write("no balance\n")
-            else:
-                coins_found = False
-                for b in data:
-                    coin = b.get("coin")
-                    available = b.get("available")
-                    if float(available) > 0:
-                        output.write(f"{coin}: available: {available}\n")
-                        coins_found = True
-                if not coins_found:
+        ########################################################################
+        # 3) Bitget Spot Balances
+        ########################################################################
+        output.write("\n=== Bitget Spot Balances ===\n")
+        try:
+            res = self.check_spot_balance()
+            if res and res.get("code") == "00000":
+                data = res.get("data", [])
+                if not data:
                     output.write("no balance\n")
-        else:
-            output.write("Bitget balance query failed\n")
+                else:
+                    coins_found = False
+                    temp_list = []
+                    for b in data:
+                        coin_name = b.get("coin", "").upper()
+                        available = float(b.get("available", 0.0))
+                        if available > 0:
+                            coins_found = True
+                            temp_list.append((coin_name, available))
 
+                    if not coins_found:
+                        output.write("no balance\n")
+                    else:
+                        def sort_key_bgs(item):
+                            cn, amt = item
+                            return (0 if cn == "USDT" else 1, -amt)
+
+                        temp_list.sort(key=sort_key_bgs)
+
+                        output.write("\n[BGS]\n")
+                        for cn, amt in temp_list:
+                            output.write(f"[BGS] {cn}: {amt}\n")
+            else:
+                output.write("\nBitget balance query failed\n")
+        except Exception as e:
+            output.write(f"\n[BGS] error: {e}\n")
+
+        # 최종
         output.write("\n=== All balances end ===\n")
         return output.getvalue()
 
@@ -1210,8 +1294,408 @@ class ExManager:
         ("show_trx.COIN, trx.COIN", "COIN 거래내역 조회 (예: show_trx.BTC 혹은 trx.BTC)"),
         ("show_pnl.COIN, pnl.COIN", "COIN 손익 평가 (예: show_pnl.BTC 혹은 pnl.BTC)"),
         ("show_bal, bal", "모든 계좌 잔고 조회"),
+        ("total_val, val", "모든 계좌 보유 자산의 USDT 환산 총합 조회"),
         ("명령어, help, ?, h", "사용 가능한 명령어 목록 표시")
     ]
+    def show_total_val(self):
+        output = StringIO()
+
+        now_dt_str = get_now_dt_str_in_simple_form()
+        output.write("=== total_val: all asset value in  USDT ===\n\n")
+        output.write(f"[ dt_str: {now_dt_str} ]\n\n")
+        output.write("[ Asset => price * quantity == value ]\n\n")
+
+        grand_total = 0.0
+
+        # 계정별 sub_total을 저장할 딕셔너리
+        sub_totals = {
+            "BNS-CR": 0.0,
+            "BNS-LILAC": 0.0,
+            "BNS-EX": 0.0,
+            "BBS": 0.0,
+            "BGS": 0.0
+        }
+
+        ########################################################################
+        # 1) Binance (3계정)
+        ########################################################################
+        binance_accounts = [
+            (self.binance_client_cr, "CR"),
+            (self.binance_client_lilac, "LILAC"),
+            (self.binance_client_ex, "EX")
+        ]
+
+        for client, acc_name in binance_accounts:
+            key_name = f"BNS-{acc_name}"
+            output.write("\n")  # 계정별 구분을 위한 빈 줄
+            
+            try:
+                account_info = client.get_account()
+                balances = [
+                    asset for asset in account_info['balances']
+                    if float(asset['free']) > 0 or float(asset['locked']) > 0
+                ]
+
+                # (coin_name, total_amount, coin_sub_total) 를 임시 리스트에 담아둔 뒤 정렬
+                temp_list = []
+                for balance_item in balances:
+                    coin_name = balance_item['asset'].upper()
+                    total_amount = float(balance_item['free']) + float(balance_item['locked'])
+
+                    # 일단 0으로 초기화
+                    coin_sub_total = 0.0
+                    try:
+                        if coin_name == "USDT":
+                            # USDT면 시세=1.0
+                            coin_sub_total = total_amount
+                        else:
+                            # USDT가 아닌 경우 시세를 조회해 곱함
+                            price = self.get_current_price_binance(coin_name)
+                            coin_sub_total = total_amount * price
+                    except:
+                        # 시세 조회 실패 시 0 처리
+                        coin_sub_total = 0.0
+
+                    temp_list.append((coin_name, total_amount, coin_sub_total))
+
+                # USDT는 맨 위, 그 외는 coin_sub_total 내림차순 정렬
+                def custom_sort_key(item):
+                    coin_name, _, coin_sub_total = item
+                    
+                    # USDT → priority=0
+                    # BNB  → priority=1
+                    # 그 외 → priority=2
+                    if coin_name == "USDT":
+                        priority = 0
+                    elif coin_name == "BNB":
+                        priority = 1
+                    else:
+                        priority = 2
+
+                    return (priority, -coin_sub_total)
+                temp_list.sort(key=custom_sort_key)
+
+                sub_total = 0.0
+                for coin_name, total_amount, coin_sub_total in temp_list:
+                    if coin_name == "USDT":
+                        output.write(f"[{key_name}] USDT => 1.0000 * {total_amount:.4f} = {coin_sub_total:.4f} USDT\n")
+                    else:
+                        if coin_sub_total > 0:
+                            # 역산해서 시세 표시 (coin_sub_total / total_amount)
+                            price = coin_sub_total / total_amount
+                            output.write(f"[{key_name}] {coin_name} => {price:.4f} * {total_amount:.4f} = {coin_sub_total:.4f} USDT\n")
+                        else:
+                            output.write(f"[{key_name}] {coin_name} => FAILED to get price. => 0.0000 USDT\n")
+
+                    sub_total += coin_sub_total
+
+                output.write(f"[{key_name}] account_value: {sub_total:.4f} USDT\n")
+                sub_totals[key_name] = sub_total
+                grand_total += sub_total
+
+            except Exception as e:
+                output.write(f"[{key_name}] error: {e}\n")
+
+        ########################################################################
+        # 2) Bybit
+        ########################################################################
+        output.write("\n")
+        try:
+            bybit_balance_resp = self.bybit_client.get_wallet_balance(accountType="UNIFIED")
+            if bybit_balance_resp['retCode'] == 0:
+                sub_total = 0.0
+                temp_list = []
+
+                for account_item in bybit_balance_resp['result']['list']:
+                    for c in account_item['coin']:
+                        coin_symbol = c['coin'].upper()
+                        coin_balance = float(c.get('walletBalance', 0.0))
+                        if coin_balance <= 0:
+                            continue
+
+                        coin_sub_total = 0.0
+                        try:
+                            if coin_symbol == "USDT":
+                                coin_sub_total = coin_balance
+                            else:
+                                price = self.get_current_price_bybit(coin_symbol)
+                                coin_sub_total = coin_balance * price
+                        except:
+                            coin_sub_total = 0.0
+
+                        temp_list.append((coin_symbol, coin_balance, coin_sub_total))
+
+                def custom_sort_key_bbs(item):
+                    coin_name, _, coin_sub_total = item
+
+                    # 혹은 coin_sub_total이 None이면 0.0
+                    if coin_sub_total is None:
+                        coin_sub_total = 0.0
+
+                    if coin_name == "USDT":
+                        priority = 0
+                    elif coin_name == "BNB":
+                        priority = 1
+                    else:
+                        priority = 2
+
+                    # 내림차순: -coin_sub_total
+                    return (priority, -coin_sub_total)
+
+
+                temp_list.sort(key=custom_sort_key_bbs)
+
+                for coin_symbol, coin_balance, coin_sub_total in temp_list:
+                    if coin_symbol == "USDT":
+                        output.write(f"[BBS] USDT => 1.0000 * {coin_balance:.4f} = {coin_sub_total:.4f} USDT\n")
+                    else:
+                        if coin_sub_total > 0:
+                            price = coin_sub_total / coin_balance
+                            output.write(f"[BBS] {coin_symbol} => {price:.4f} * {coin_balance:.4f} = {coin_sub_total:.4f} USDT\n")
+                        else:
+                            output.write(f"[BBS] {coin_symbol} => FAILED to get price. => 0.0000 USDT\n")
+
+                    sub_total += coin_sub_total
+
+                output.write(f"[BBS] account_value: {sub_total:.4f} USDT\n")
+                sub_totals["BBS"] = sub_total
+                grand_total += sub_total
+            else:
+                output.write(f"[BBS] balance query error: {bybit_balance_resp['retMsg']}\n")
+        except Exception as e:
+            output.write(f"[BBS] error: {e}\n")
+
+        ########################################################################
+        # 3) Bitget
+        ########################################################################
+        output.write("\n")
+        try:
+            bitget_balances = self.check_spot_balance()
+            if bitget_balances and bitget_balances.get("code") == "00000":
+                data = bitget_balances.get("data", [])
+                sub_total = 0.0
+                temp_list = []
+
+                for b in data:
+                    coin_name = b.get("coin", "").upper()
+                    available_amount = float(b.get("available", 0.0))
+                    if available_amount <= 0:
+                        continue
+
+                    coin_sub_total = 0.0
+                    try:
+                        if coin_name == "USDT":
+                            coin_sub_total = available_amount
+                        else:
+                            price = self.get_current_price_bitget(coin_name)
+                            coin_sub_total = available_amount * price
+                    except:
+                        coin_sub_total = 0.0
+
+                    temp_list.append((coin_name, available_amount, coin_sub_total))
+
+                def custom_sort_key_bgs(item):
+                    coin_name, _, coin_sub_total = item
+
+                    if coin_sub_total is None:
+                        coin_sub_total = 0.0
+
+                    if coin_name == "USDT":
+                        priority = 0
+                    elif coin_name == "BNB":
+                        priority = 1
+                    else:
+                        priority = 2
+
+                    return (priority, -coin_sub_total)
+
+                for cn, amt, cst in temp_list:
+                    if cn == "USDT":
+                        output.write(f"[BGS] USDT => 1.0000 * {amt:.4f} = {cst:.4f} USDT\n")
+                    else:
+                        if cst > 0:
+                            price = cst / amt
+                            output.write(f"[BGS] {cn} => {price:.4f} * {amt:.4f} = {cst:.4f} USDT\n")
+                        else:
+                            output.write(f"[BGS] {cn} => FAILED to get price. => 0.0000 USDT\n")
+
+                    sub_total += cst
+
+                output.write(f"[BGS] account_value: {sub_total:.4f} USDT\n")
+                sub_totals["BGS"] = sub_total
+                grand_total += sub_total
+            else:
+                output.write("[BGS] balance query failed\n")
+        except Exception as e:
+            output.write(f"[BGS] error: {e}\n")
+
+        # 최종 요약부
+        output.write("\n=== final summary: all accounts value in USDT ===\n\n")
+        output.write(f"[BNS-CR] account_value: {sub_totals['BNS-CR']:.4f} USDT\n")
+        output.write(f"[BNS-LILAC] account_value: {sub_totals['BNS-LILAC']:.4f} USDT\n")
+        output.write(f"[BNS-EX] account_value: {sub_totals['BNS-EX']:.4f} USDT\n\n")
+        output.write(f"[BBS] account_value: {sub_totals['BBS']:.4f} USDT\n\n")
+        output.write(f"[BGS] account_value: {sub_totals['BGS']:.4f} USDT\n\n")
+
+        # 소숫점 버림 + 천단위 콤마
+        floored_grand_total = int(grand_total)
+        floored_formatted_str = f"{floored_grand_total:,}"
+        output.write(f"=== Cluster Total Value: {floored_formatted_str} USDT ===\n")
+
+        return output.getvalue()
+
+    def check_all_balances(self):
+        """
+        bal 명령어 실행 시 호출되는 함수.
+        - USDT를 맨 위, 나머지는 보유 수량 내림차순
+        - "[BNS-CR]" 등 단독 줄 제거
+        - "[BNS-CR] USDT: ..." 이런 식의 코인 라인만 출력
+        - 계정 사이에는 한 줄 공백만 둠
+        """
+        from io import StringIO
+        output = StringIO()
+
+        output.write("=== All Balances ===\n\n")
+
+        ########################################################################
+        # 1) Binance (3계정)
+        ########################################################################
+        output.write("=== Binance Spot Balances (3acc) ===\n")
+
+        binance_accounts = [
+            (self.binance_client_cr, "CR"),
+            (self.binance_client_lilac, "LILAC"),
+            (self.binance_client_ex, "EX")
+        ]
+
+        for client, acc_name in binance_accounts:
+            key_name = f"[BNS-{acc_name}]"
+            try:
+                account_info = client.get_account()
+                balances = [
+                    asset for asset in account_info['balances']
+                    if float(asset['free']) > 0 or float(asset['locked']) > 0
+                ]
+
+                # (coin_name, total_amt)
+                temp_list = []
+                for b in balances:
+                    coin_name = b['asset'].upper()
+                    total_amt = float(b['free']) + float(b['locked'])
+                    temp_list.append((coin_name, total_amt))
+
+                # 정렬: USDT → 맨 위, BNB → 그 다음, 나머지는 total_amt 내림차순
+                def sort_key(item):
+                    c_name, amt = item
+                    if c_name == "USDT":
+                        priority = 0
+                    elif c_name == "BNB":
+                        priority = 1
+                    else:
+                        priority = 2
+                    return (priority, -amt)
+
+                temp_list.sort(key=sort_key)
+
+                # **계정별 한 줄 공백**만 찍고, 코인 라인은 "[BNS-CR] 코인명: 수량"
+                output.write("\n")  # 계정 구분용 공백
+                for coin_name, total_amt in temp_list:
+                    # ⬇⬇⬇ 여기서 소숫점 8자리로 표시
+                    output.write(f"{key_name} {coin_name}: {total_amt:.8f}\n")
+
+            except Exception as e:
+                output.write(f"\n{key_name} error: {e}\n")
+
+        ########################################################################
+        # 2) Bybit Unified Balances
+        ########################################################################
+        output.write("\n=== Bybit Unified Balances ===\n")
+
+        try:
+            response = self.bybit_client.get_wallet_balance(accountType="UNIFIED")
+            if response['retCode'] == 0:
+                temp_list = []
+                any_balance = False
+
+                for account_item in response['result']['list']:
+                    for c in account_item['coin']:
+                        coin_name = c['coin'].upper()
+                        w_bal = float(c.get('walletBalance', 0))
+                        if w_bal > 0:
+                            any_balance = True
+                            temp_list.append((coin_name, w_bal))
+
+                if not any_balance:
+                    output.write("no balance\n")
+                else:
+                    def sort_key_bbs(item):
+                        c_name, amt = item
+                        if c_name == "USDT":
+                            priority = 0
+                        elif c_name == "BNB":
+                            priority = 1
+                        else:
+                            priority = 2
+                        return (priority, -amt)
+
+                    temp_list.sort(key=sort_key_bbs)
+
+                    output.write("\n")
+                    for coin_name, w_bal in temp_list:
+                        # ⬇⬇⬇ 여기서도 소숫점 8자리 표시
+                        output.write(f"[BBS] {coin_name}: {w_bal:.8f}\n")
+            else:
+                output.write(f"\nbalance query failed: {response['retMsg']}\n")
+        except Exception as e:
+            output.write(f"\nerror: {e}\n")
+
+        ########################################################################
+        # 3) Bitget Spot Balances
+        ########################################################################
+        output.write("\n=== Bitget Spot Balances ===\n")
+        try:
+            res = self.check_spot_balance()
+            if res and res.get("code") == "00000":
+                data = res.get("data", [])
+                if not data:
+                    output.write("no balance\n")
+                else:
+                    temp_list = []
+                    any_balance = False
+                    for b in data:
+                        cn = b.get("coin", "").upper()
+                        amt = float(b.get("available", 0.0))
+                        if amt > 0:
+                            any_balance = True
+                            temp_list.append((cn, amt))
+
+                    if not any_balance:
+                        output.write("no balance\n")
+                    else:
+                        def sort_key_bgs(item):
+                            c_name, amt = item
+                            if c_name == "USDT":
+                                priority = 0
+                            elif c_name == "BNB":
+                                priority = 1
+                            else:
+                                priority = 2
+                            return (priority, -amt)
+
+                        temp_list.sort(key=sort_key_bgs)
+
+                        output.write("\n")
+                        for cn, amt in temp_list:
+                            # ⬇⬇⬇ 여기도 소숫점 8자리
+                            output.write(f"[BGS] {cn}: {amt:.8f}\n")
+            else:
+                output.write("\nBitget balance query failed\n")
+        except Exception as e:
+            output.write(f"\nerror: {e}\n")
+
+        output.write("\n=== All balances end ===\n")
+        return output.getvalue()
+
 
     def execute_command(self, text):
         """
@@ -1302,6 +1786,13 @@ class ExManager:
                 # 기존: print(self.check_all_balances())
                 result_str = self.check_all_balances()
                 buffer.write(result_str)
+
+            # ==== [ADD: total_val] Start
+            elif text_lower in ["total_val", "val"]:
+                # 추가된 명령어: 모든 계좌의 코인 보유량을 USDT로 환산하여 합계를 표시
+                result_str = self.show_total_val()
+                buffer.write(result_str)
+            # ==== [ADD: total_val] End
 
             # 명령어, help, ?, h
             elif text_lower in ["명령어", "help", "?", "h"]:
