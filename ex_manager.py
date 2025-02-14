@@ -14,6 +14,8 @@ import hmac
 import hashlib
 import datetime
 from io import StringIO
+import datetime
+import pytz
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from binance.client import Client
@@ -401,27 +403,59 @@ class ExManager:
         except Exception as e:
             return {"error": str(e)}
 
-    def calculate_account_avg_buy_price(self, client, coin):
+    def calculate_position_avgprice_full_binance(self, client, coin):
+        """
+        1) get_recent_trades_raw_binance(...) 를 통해 체결 목록 전체(매수+매도) 가져옴
+        2) 시간순으로 정렬
+        3) Running Average 로직으로 최종 (position, avg_price) 도출
+        - 매수 => 평단 갱신
+        - 매도 => position 감소
+        4) 반환: (position, avg_price)
+        """
         trades = self.get_recent_trades_raw_binance(client, coin)
         if isinstance(trades, dict) and trades.get("error"):
-            return None
+            # API 오류 시 (position=0, avg_price=0) 반환
+            return (0.0, 0.0)
         if not isinstance(trades, list):
-            return None
+            # 체결 정보가 이상하면 (0,0)
+            return (0.0, 0.0)
 
-        total_qty = 0.0
-        total_cost = 0.0
+        # 시간 오름차순 정렬
+        trades.sort(key=lambda x: x['time'])
+
+        position = 0.0
+        avg_price = 0.0
+
         for t in trades:
-            if float(t['qty']) > 0 and t['isBuyer']:
-                trade_price = float(t['price'])
-                trade_qty = float(t['qty'])
-                total_cost += trade_price * trade_qty
-                total_qty += trade_qty
+            qty = float(t['qty'])
+            price = float(t['price'])
+            is_buyer = bool(t['isBuyer'])
 
-        if total_qty > 0:
-            avg_price = total_cost / total_qty
-            return avg_price
-        else:
-            return None
+            if qty <= 0:
+                continue
+
+            if is_buyer:
+                # ── 매수 로직: 가중평균 업데이트 ──
+                total_cost_before = position * avg_price
+                total_cost_after  = total_cost_before + (qty * price)
+                new_position      = position + qty
+
+                avg_price = total_cost_after / new_position
+                position  = new_position
+            else:
+                # ── 매도 로직: position에서 qty 차감 ──
+                if qty > position:
+                    # 현물에서 초과매도는 일반적이지 않으나
+                    # 오류 처리 or position = 0 로 맞추는 등
+                    qty = position
+                position -= qty
+                if position <= 1e-12:
+                    position  = 0.0
+                    avg_price = 0.0
+
+        return (position, avg_price)
+
+
 
     def get_bid1_price_binance(self, coin):
         symbol = coin.upper() + "USDT"
@@ -619,27 +653,46 @@ class ExManager:
         except Exception as e:
             return {"error": str(e)}
 
-    def calculate_bybit_avg_buy_price(self, coin):
+    def calculate_position_avgprice_full_bybit(self, coin):
+        """
+        Bybit 체결 리스트(매수+매도) 전체를 시간순 정렬 후
+        Running Average 로직으로 최종 position, avg_price 반환
+        """
         trades = self.get_recent_bybit_trades_raw(coin)
         if isinstance(trades, dict) and trades.get("error"):
-            return None
+            return (0.0, 0.0)
         if not isinstance(trades, list):
-            return None
+            return (0.0, 0.0)
 
-        total_qty = 0.0
-        total_cost = 0.0
+        trades.sort(key=lambda x: x['time'])
+
+        position = 0.0
+        avg_price = 0.0
+
         for t in trades:
-            if t.get('isBuyer'):
-                trade_price = float(t['price'])
-                trade_qty = float(t['qty'])
-                total_cost += trade_price * trade_qty
-                total_qty += trade_qty
+            qty = float(t['qty'])
+            price = float(t['price'])
+            is_buyer = bool(t['isBuyer'])
 
-        if total_qty > 0:
-            avg_price = total_cost / total_qty
-            return avg_price
-        else:
-            return None
+            if qty <= 0:
+                continue
+
+            if is_buyer:
+                total_cost_before = position * avg_price
+                total_cost_after  = total_cost_before + (qty * price)
+                new_position      = position + qty
+
+                avg_price = total_cost_after / new_position
+                position  = new_position
+            else:
+                if qty > position:
+                    qty = position
+                position -= qty
+                if position <= 1e-12:
+                    position  = 0.0
+                    avg_price = 0.0
+
+        return (position, avg_price)
 
     def get_bid1_price_bybit(self, coin):
         symbol = coin.upper() + "USDT"
@@ -836,27 +889,47 @@ class ExManager:
         except Exception as e:
             return {"error": str(e)}
 
-    def calculate_bg_avg_buy_price(self, coin):
+    def calculate_position_avgprice_full_bitget(self, coin):
+        """
+        Bitget 체결(매수+매도) 전체 -> 시간순 정렬 -> Running Average
+        최종 (position, avg_price) 도출
+        """
         trades = self.get_recent_bg_trades_raw(coin)
         if isinstance(trades, dict) and trades.get("error"):
-            return None
+            return (0.0, 0.0)
         if not isinstance(trades, list):
-            return None
+            return (0.0, 0.0)
 
-        total_qty = 0.0
-        total_cost = 0.0
+        trades.sort(key=lambda x: x['time'])
+
+        position = 0.0
+        avg_price = 0.0
+
         for t in trades:
-            if t.get('isBuyer'):
-                trade_price = float(t['price'])
-                trade_qty = float(t['qty'])
-                total_cost += trade_price * trade_qty
-                total_qty += trade_qty
+            qty = float(t['qty'])
+            price = float(t['price'])
+            is_buyer = bool(t['isBuyer'])
 
-        if total_qty > 0:
-            avg_price = total_cost / total_qty
-            return avg_price
-        else:
-            return None
+            if qty <= 0:
+                continue
+
+            if is_buyer:
+                total_cost_before = position * avg_price
+                total_cost_after  = total_cost_before + (qty * price)
+                new_position      = position + qty
+
+                avg_price = total_cost_after / new_position
+                position  = new_position
+            else:
+                if qty > position:
+                    qty = position
+                position -= qty
+                if position <= 1e-12:
+                    position  = 0.0
+                    avg_price = 0.0
+
+        return (position, avg_price)
+
 
     def get_bid1_price_bitget(self, coin):
         try:
@@ -876,35 +949,34 @@ class ExManager:
     ##############################################
     def show_profit_loss_per_account(self, coin):
         output = StringIO()
-        output.write("=== PnL Calculation Based on bid1 ===\n\n")
+        output.write("=== PnL Calculation (Full History) ===\n\n")
 
-        bid1_binance = None
-        bid1_bybit = None
-        bid1_bitget = None
-
-        # Binance bid1 price
+        # 1) bid1/binance price 등등
         try:
             bid1_binance = self.get_bid1_price_binance(coin)
             output.write(f"Binance bid1 price: {bid1_binance}\n\n")
         except Exception as e:
+            bid1_binance = None
             output.write(f"Failed to fetch Binance bid1 price for {coin}: {e}\n\n")
 
-        # Bybit bid1 price
         try:
             bid1_bybit = self.get_bid1_price_bybit(coin)
             output.write(f"Bybit bid1 price: {bid1_bybit}\n\n")
         except Exception as e:
+            bid1_bybit = None
             output.write(f"Failed to fetch Bybit bid1 price for {coin}: {e}\n\n")
 
-        # Bitget bid1 price
         try:
             bid1_bitget = self.get_bid1_price_bitget(coin)
             output.write(f"Bitget bid1 price: {bid1_bitget}\n\n")
         except Exception as e:
+            bid1_bitget = None
             output.write(f"Failed to fetch Bitget bid1 price for {coin}: {e}\n\n")
 
+        # ─────────────────────────────────────────────────────────────────
+        # BINANCE (3 계정)
+        # ─────────────────────────────────────────────────────────────────
         output.write("=== Binance PnL ===\n\n")
-
         binance_accounts = [
             (self.binance_client_cr, "CR"),
             (self.binance_client_lilac, "LILAC"),
@@ -912,108 +984,84 @@ class ExManager:
         ]
         for client, acc_name in binance_accounts:
             try:
-                avg_price = self.calculate_account_avg_buy_price(client, coin)
-                if avg_price is not None and bid1_binance is not None:
-                    pnl = bid1_binance - avg_price
-                    pnl_percent = (pnl / avg_price) * 100.0
-                    output.write(f"[BNS-{acc_name}] bid1_price: ${bid1_binance:.6f}, avg_price: ${avg_price:.6f}, pnl: {pnl_percent:.3f}%\n")
+                # ★ 변경 부분: 새 함수
+                position, avg_price = self.calculate_position_avgprice_full_binance(client, coin)
+
+                if position > 0 and bid1_binance is not None:
+                    pnl_percent = ((bid1_binance - avg_price) / avg_price) * 100.0
+                    output.write(
+                        f"[BNS-{acc_name}] bid1_price: ${bid1_binance:.6f}, "
+                        f"avg_price: ${avg_price:.6f}, holding: {position:.4f}, "
+                        f"PNL: {pnl_percent:.3f}%\n"
+                    )
                 else:
-                    if avg_price is None:
-                        output.write(f"[BNS-{acc_name}] no buy history\n")
+                    # no position or no price
+                    if position <= 0:
+                        output.write(f"[BNS-{acc_name}] no position (0 {coin.upper()})\n")
                     else:
                         output.write(f"[BNS-{acc_name}] bid1 price unavailable\n")
 
-                # ▼▼▼▼▼ [추가] Binance 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
-                try:
-                    balance_info = client.get_asset_balance(asset=coin.upper())
-                    balance_amount = float(balance_info['free']) if balance_info and balance_info.get('free') else 0.0
-                    if balance_amount > 0 and bid1_binance is not None:
-                        current_value = balance_amount * bid1_binance
-                        output.write(f"[BNS-{acc_name}] holding: {balance_amount:.6f} {coin.upper()} == ${current_value:.2f}\n\n")
-                    else:
-                        output.write(f"[BNS-{acc_name}] holding: 0 {coin.upper()}\n\n")
-                except Exception as e2:
-                    output.write(f"[BNS-{acc_name}] holding check error: {e2}\n\n")
-                # ▲▲▲▲▲ [추가] Binance 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
+                # holding value도 출력하고 싶으면 추가:
+                # if position > 0 and bid1_binance is not None:
+                #     holding_val = position * bid1_binance
+                #     output.write(f"   => holding value: ${holding_val:.2f}\n\n")
 
             except Exception as e:
-                output.write(f"[BNS-{acc_name}] Error calculating PnL: {e}\n\n")
+                output.write(f"[BNS-{acc_name}] Error: {e}\n\n")
         output.write("\n")
 
+        # ─────────────────────────────────────────────────────────────────
+        # BYBIT
+        # ─────────────────────────────────────────────────────────────────
         output.write("=== Bybit PnL ===\n\n")
         try:
-            avg_price_bybit = self.calculate_bybit_avg_buy_price(coin)
-            if avg_price_bybit is not None and bid1_bybit is not None:
-                pnl = bid1_bybit - avg_price_bybit
-                pnl_percent = (pnl / avg_price_bybit) * 100.0
-                output.write(f"[BBS] bid1_price: ${bid1_bybit:.6f}, avg_price: ${avg_price_bybit:.6f}, pnl: {pnl_percent:.3f}%\n")
+            position_bbs, avg_price_bbs = self.calculate_position_avgprice_full_bybit(coin)
+            if position_bbs > 0 and bid1_bybit is not None:
+                pnl_percent = ((bid1_bybit - avg_price_bbs) / avg_price_bbs) * 100.0
+                output.write(
+                    f"[BBS] bid1_price: ${bid1_bybit:.6f}, "
+                    f"avg_price: ${avg_price_bbs:.6f}, holding: {position_bbs:.4f}, "
+                    f"PNL: {pnl_percent:.3f}%\n"
+                )
             else:
-                if avg_price_bybit is None:
-                    output.write("[BBS] no buy history\n")
+                if position_bbs <= 0:
+                    output.write("[BBS] no position\n")
                 else:
                     output.write("[BBS] bid1 price unavailable\n")
 
-            # ▼▼▼▼▼ [추가] Bybit 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
-            try:
-                response = self.bybit_client.get_wallet_balance(accountType="UNIFIED")
-                if response['retCode'] == 0:
-                    coin_balance = 0.0
-                    for account_item in response['result']['list']:
-                        for c in account_item['coin']:
-                            if c['coin'].upper() == coin.upper():
-                                coin_balance = float(c.get('walletBalance', 0.0))
-                                break
-                    if coin_balance > 0 and bid1_bybit is not None:
-                        current_value = coin_balance * bid1_bybit
-                        output.write(f"[BBS] holding: {coin_balance:.6f} {coin.upper()} == ${current_value:.2f}\n\n")
-                    else:
-                        output.write(f"[BBS] holding: 0 {coin.upper()}\n\n")
-                else:
-                    output.write(f"[BBS] holding check error: {response['retMsg']}\n\n")
-            except Exception as e2:
-                output.write(f"[BBS] holding check error: {e2}\n\n")
-            # ▲▲▲▲▲ [추가] Bybit 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
-
         except Exception as e:
-            output.write(f"[BBS] Error calculating PnL: {e}\n")
+            output.write(f"[BBS] Error: {e}\n")
         output.write("\n")
 
+        # ─────────────────────────────────────────────────────────────────
+        # BITGET
+        # ─────────────────────────────────────────────────────────────────
         output.write("=== Bitget PnL ===\n\n")
         try:
-            avg_price_bg = self.calculate_bg_avg_buy_price(coin)
-            if avg_price_bg is not None and bid1_bitget is not None:
-                pnl = bid1_bitget - avg_price_bg
-                pnl_percent = (pnl / avg_price_bg) * 100.0
-                output.write(f"[BGS] bid1_price: ${bid1_bitget:.6f}, avg_price: ${avg_price_bg:.6f}, pnl: {pnl_percent:.3f}%\n")
+            position_bgs, avg_price_bgs = self.calculate_position_avgprice_full_bitget(coin)
+            if position_bgs > 0 and bid1_bitget is not None:
+                pnl_percent = ((bid1_bitget - avg_price_bgs) / avg_price_bgs) * 100.0
+                output.write(
+                    f"[BGS] bid1_price: ${bid1_bitget:.6f}, "
+                    f"avg_price: ${avg_price_bgs:.6f}, holding: {position_bgs:.4f}, "
+                    f"PNL: {pnl_percent:.3f}%\n"
+                )
             else:
-                if avg_price_bg is None:
-                    output.write("[BGS] no buy history\n")
+                if position_bgs <= 0:
+                    output.write("[BGS] no position\n")
                 else:
-                    output.write("[BGS] bid1_price unavailable\n")
-
-            # ▼▼▼▼▼ [추가] Bitget 보유 수량 * 현재 bid1 값 출력 ▼▼▼▼▼
-            try:
-                res = self.check_spot_balance(coin=coin.upper())
-                coin_balance = 0.0
-                if res and res.get("code") == "00000":
-                    for b in res.get("data", []):
-                        if b.get("coin", "").upper() == coin.upper():
-                            coin_balance = float(b.get("available", 0.0))
-                            break
-                if coin_balance > 0 and bid1_bitget is not None:
-                    current_value = coin_balance * bid1_bitget
-                    output.write(f"[BGS] holding: {coin_balance:.6f} {coin.upper()} == ${current_value:.2f}\n\n")
-                else:
-                    output.write(f"[BGS] holding: 0 {coin.upper()}\n\n")
-            except Exception as e2:
-                output.write(f"[BGS] holding check error: {e2}\n\n")
-            # ▲▲▲▲▲ [추가] Bitget 보유 수량 * 현재 bid1 값 출력 ▲▲▲▲▲
+                    output.write("[BGS] bid1 price unavailable\n")
 
         except Exception as e:
-            output.write(f"[BGS] Error calculating PnL: {e}\n\n")
+            output.write(f"[BGS] Error: {e}\n")
         output.write("\n")
 
+        # 필요시 안내 문구
+        output.write("※ 위 계산은 전 체결(매수/매도)을 가중평균으로 추적한 결과입니다.\n")
+        output.write("※ 미실현 손익(%) = (bid1 - avg_price) / avg_price * 100\n")
+
         return output.getvalue()
+
 
 
     ##############################################
