@@ -1268,7 +1268,233 @@ class ExManager:
         output.write(str(bg_result) + "\n\n")
         return output.getvalue()
     ##############################################
-    
+
+    def show_trx_pnl(self, coin):
+        """
+        거래소별 체결 내역(시간순) + 매도 때마다
+        1) 부분 PnL(해당 매도분만)
+        2) 누적 PnL(지금까지 팔린 전체 물량 합산)
+        을 모두 표시
+        """
+        from io import StringIO
+        import datetime
+
+        output = StringIO()
+        c = coin.upper()
+        output.write(f"=== Transaction History + PnL for {c} ===\n\n")
+
+        # --------------------------------------------------------
+        # 1) Binance (CR / LILAC / EX)
+        # --------------------------------------------------------
+        binance_accounts = [
+            (self.binance_client_cr, "CR"),
+            (self.binance_client_lilac, "LILAC"),
+            (self.binance_client_ex, "EX")
+        ]
+        for client, acc_name in binance_accounts:
+            trades = self.get_recent_trades_raw_binance(client, c)
+            if isinstance(trades, dict) and trades.get("error"):
+                output.write(f"=== Binance ({acc_name}) [{c}] ===\n\n{trades}\n\n")
+                continue
+
+            if not trades or len(trades) == 0:
+                output.write(f"=== Binance ({acc_name}) [{c}] ===\n\nno fills.\n\n")
+                continue
+
+            # 시간순 정렬
+            trades.sort(key=lambda x: x['time'])
+
+            output.write(f"=== Binance ({acc_name}) [{c}] ===\n\n")
+
+            # Running Average 로직
+            position = 0.0
+            avg_price = 0.0
+
+            # ★추가: 누적 실현 손익(usd) + 누적 원가(cost_sold)
+            realized_pnl = 0.0   # 지금까지 매도로 확정된 손익 (USD)
+            cost_sold    = 0.0   # 지금까지 매도된 물량의 "매수 원가" 합
+
+            for t in trades:
+                timestamp_ms = t['time']
+                dt_str = datetime.datetime.fromtimestamp(timestamp_ms/1000.0)
+                side_str = "bid" if t['isBuyer'] else "ask"
+                trade_qty = float(t['qty'])
+                trade_price = float(t['price'])
+
+                # 기본 체결 라인 출력
+                output.write(f"{dt_str} {side_str} {trade_qty} {c} at {trade_price}\n")
+
+                if side_str == "bid":
+                    # 매수 → 평단 갱신
+                    total_cost_before = position * avg_price
+                    total_cost_after  = total_cost_before + (trade_qty * trade_price)
+                    new_position      = position + trade_qty
+
+                    avg_price = total_cost_after / new_position
+                    position  = new_position
+
+                else:
+                    # 매도 → 부분/누적 PnL
+                    if trade_qty > position:
+                        trade_qty = position
+                    if trade_qty <= 0:
+                        continue
+
+                    delta_pnl  = (trade_price - avg_price) * trade_qty     # 이번 매도분의 손익(USD)
+                    delta_cost = avg_price * trade_qty                    # 이번 매도분 원가(USD)
+
+                    # (1) 부분(단건) PnL %
+                    partial_percent = 0.0
+                    if delta_cost > 0:
+                        partial_percent = (delta_pnl / delta_cost) * 100.0
+
+                    # (2) 누적 PnL %
+                    realized_pnl += delta_pnl
+                    cost_sold    += delta_cost
+
+                    cumulative_percent = 0.0
+                    if cost_sold > 0:
+                        cumulative_percent = (realized_pnl / cost_sold) * 100.0
+
+                    # 포지션 차감
+                    position -= trade_qty
+                    if position <= 1e-12:
+                        position = 0.0
+                        avg_price = 0.0
+
+                    # 매도 체결 아래에 부분 PnL, 누적 PnL 출력
+                    output.write(f"pnl (this sell)      : {partial_percent:.4f}%\n")
+                    output.write(f"pnl (cumulative)    : {cumulative_percent:.4f}%\n\n")
+
+            output.write("\n")
+
+        # --------------------------------------------------------
+        # 2) Bybit
+        # --------------------------------------------------------
+        bb_trades = self.get_recent_bybit_trades_raw(c)
+        if isinstance(bb_trades, dict) and bb_trades.get("error"):
+            output.write(f"=== Bybit [{c}] ===\n\n{bb_trades}\n\n")
+        else:
+            if not bb_trades or len(bb_trades) == 0:
+                output.write(f"=== Bybit [{c}] ===\n\nno fills.\n\n")
+            else:
+                bb_trades.sort(key=lambda x: x['time'])
+                output.write(f"=== Bybit [{c}] ===\n\n")
+
+                position = 0.0
+                avg_price = 0.0
+
+                realized_pnl = 0.0
+                cost_sold    = 0.0
+
+                for t in bb_trades:
+                    dt_str = datetime.datetime.fromtimestamp(t['time']/1000.0)
+                    side_str = "bid" if t['isBuyer'] else "ask"
+                    qty = float(t['qty'])
+                    price = float(t['price'])
+
+                    output.write(f"{dt_str} {side_str} {qty} {c} at {price}\n")
+
+                    if side_str == "bid":
+                        total_cost_before = position * avg_price
+                        total_cost_after  = total_cost_before + (qty * price)
+                        new_pos = position + qty
+                        avg_price = total_cost_after / new_pos
+                        position = new_pos
+                    else:
+                        if qty > position:
+                            qty = position
+                        if qty <= 0:
+                            continue
+
+                        delta_pnl  = (price - avg_price) * qty
+                        delta_cost = avg_price * qty
+                        partial_percent = 0.0
+                        if delta_cost > 0:
+                            partial_percent = (delta_pnl / delta_cost) * 100.0
+
+                        realized_pnl += delta_pnl
+                        cost_sold    += delta_cost
+                        cumulative_percent = 0.0
+                        if cost_sold > 0:
+                            cumulative_percent = (realized_pnl / cost_sold) * 100.0
+
+                        position -= qty
+                        if position <= 1e-12:
+                            position=0.0
+                            avg_price=0.0
+
+                        output.write(f"pnl (this sell)   : {partial_percent:.4f}%\n")
+                        output.write(f"pnl (cumulative) : {cumulative_percent:.4f}%\n\n")
+
+                output.write("\n")
+
+
+        # --------------------------------------------------------
+        # 3) Bitget
+        # --------------------------------------------------------
+        bg_trades = self.get_recent_bg_trades_raw(c)
+        if isinstance(bg_trades, dict) and bg_trades.get("error"):
+            output.write(f"=== Bitget [{c}] ===\n\n{bg_trades}\n\n")
+        else:
+            if not bg_trades or len(bg_trades) == 0:
+                output.write(f"=== Bitget [{c}] ===\n\nno fills.\n\n")
+            else:
+                bg_trades.sort(key=lambda x: x['time'])
+                output.write(f"=== Bitget [{c}] ===\n\n")
+
+                position = 0.0
+                avg_price = 0.0
+
+                realized_pnl = 0.0
+                cost_sold    = 0.0
+
+                for t in bg_trades:
+                    dt_str = datetime.datetime.fromtimestamp(t['time']/1000.0)
+                    side_str = "bid" if t['isBuyer'] else "ask"
+                    qty = float(t['qty'])
+                    price = float(t['price'])
+
+                    output.write(f"{dt_str} {side_str} {qty} {c} at {price}\n")
+
+                    if side_str == "bid":
+                        total_cost_before = position * avg_price
+                        total_cost_after  = total_cost_before + (qty * price)
+                        new_pos = position + qty
+                        avg_price = total_cost_after / new_pos
+                        position = new_pos
+                    else:
+                        if qty > position:
+                            qty = position
+                        if qty <= 0:
+                            continue
+
+                        delta_pnl  = (price - avg_price) * qty
+                        delta_cost = avg_price * qty
+                        partial_percent = 0.0
+                        if delta_cost > 0:
+                            partial_percent = (delta_pnl / delta_cost) * 100.0
+
+                        realized_pnl += delta_pnl
+                        cost_sold    += delta_cost
+                        cumulative_percent = 0.0
+                        if cost_sold > 0:
+                            cumulative_percent = (realized_pnl / cost_sold) * 100.0
+
+                        position -= qty
+                        if position <= 1e-12:
+                            position=0.0
+                            avg_price=0.0
+
+                        output.write(f"pnl (this sell)   : {partial_percent:.4f}%\n")
+                        output.write(f"pnl (cumulative) : {cumulative_percent:.4f}%\n\n")
+
+                output.write("\n")
+
+        return output.getvalue()
+
+
+
     # 새로 추가: 부분매도 (퍼센트) - 모든 거래소
     def sell_partial_all(self, coin, percent):
         """
@@ -1853,6 +2079,16 @@ class ExManager:
                     buffer.write(f"{cmd} : {desc}\n")
                 buffer.write("\n")
                 buffer.write("\nlisting-handler-walsook v0.1.0\n\n")
+
+            elif text_lower.startswith("trxpnl."):
+                # 형식: trxpnl.COIN
+                parts = text_lower.split(".")
+                if len(parts) == 2:
+                    coin = parts[1]
+                    result_str = self.show_trx_pnl(coin)
+                    buffer.write(result_str)
+                else:
+                    buffer.write("format: trxpnl.COIN\n")
 
             else:
                 # 기존: print("No such feature.\n")
